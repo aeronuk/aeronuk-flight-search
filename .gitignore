@@ -2,3 +2,4 @@
 /vendor/
 /var/
 .DS_Store
+/.worktrees/
