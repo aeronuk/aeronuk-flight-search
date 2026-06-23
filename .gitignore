@@ -10,3 +10,4 @@
 ###< symfony/framework-bundle ###
 
 /.worktrees/
+.DS_Store
