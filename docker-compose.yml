@@ -28,6 +28,7 @@ services:
       MYSQL_ROOT_PASSWORD: aeronuk
     volumes:
       - flight_search_mysql_data:/var/lib/mysql
+      - ./mysql-init:/docker-entrypoint-initdb.d:ro
     networks:
       - aeronuk-network
 
