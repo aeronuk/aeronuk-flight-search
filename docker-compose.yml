@@ -1,19 +1,25 @@
 services:
 
   aeronuk-flight-search:
-    build: .
+    build:
+      context: .
+      target: frankenphp_dev
     container_name: aeronuk-flight-search
+    restart: unless-stopped
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
+      - /app/var
+    environment:
+      APP_ENV: dev
     depends_on:
       - flight-search-db
-    environment:
-      DATABASE_URL: mysql://aeronuk:aeronuk@flight-search-db:3306/flight_search
     networks:
       - aeronuk-network
 
   flight-search-db:
-    image: mysql:8
+    image: mysql:8.4
     container_name: aeronuk-flight-search-db
     environment:
       MYSQL_DATABASE: flight_search

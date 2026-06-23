@@ -1,0 +1,26 @@
+{
+	skip_install_trust
+	frankenphp
+}
+
+:8000 {
+	root /app/public
+	encode zstd br gzip
+
+	@phpRoute {
+		not file {path}
+	}
+	rewrite @phpRoute index.php
+
+	@frontController path index.php
+	php @frontController {
+		worker {
+			file ./public/index.php
+			{$FRANKENPHP_WORKER_CONFIG}
+		}
+	}
+
+	file_server {
+		hide *.php
+	}
+}
