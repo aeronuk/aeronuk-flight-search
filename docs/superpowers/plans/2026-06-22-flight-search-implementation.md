@@ -22,7 +22,9 @@
 - **`AirportCode` is a closed, string-backed PHP enum** (cases: `JFK`, `LAX`, `ORD`, `SFO`, `LHR`, `NRT` — the airports used in the seed fixtures). Doctrine maps it natively via `enumType` on the column. This directly answers "what if the user picks a nonexistent airport" — `AirportCode::tryFrom('ZZZ')` returns `null`, both for `Flight` construction and for validating `origin`/`destination` query params in the controller.
 - **`Money` is a Doctrine embeddable value object** (`amount` + `currency`), validated in its constructor (amount must match `\d+\.\d{2}`, currency must be 3 uppercase letters). It replaces separate `price`/`currency` scalar fields on `Flight` — the JSON response nests them as `"price": {"amount": "...", "currency": "..."}` instead of two flat fields.
 - **`Flight`'s constructor enforces `departureTime < arrivalTime`**, throwing `\InvalidArgumentException` otherwise.
-- **`Seat`'s `ManyToOne` to `Flight` uses `fetch: 'EAGER'`.** Doctrine lazy-loads associations via proxy objects, and proxies have known bugs interacting with `readonly` properties (unset-on-proxy-construction errors). Eager-loading a `Flight` via a JOIN whenever a `Seat` loads sidesteps that risk entirely — cheap anyway, since a seat always belongs to exactly one flight.
+- **`Seat`'s `ManyToOne` to `Flight` uses `fetch: 'EAGER'`.** Doctrine lazy-loads associations via proxy objects, and proxies have known bugs interacting with `readonly` properties (unset-on-proxy-construction errors). Eager-loading a `Flight` via a JOIN whenever a `Seat` loads sidesteps that risk entirely — cheap anyway, since a seat always belongs to exactly one flight. This is a one-directional decision: it does **not** make looking up "seats for a flight" automatic (that's the opposite direction), so `SeatRepository::findByFlight()` stays — deliberately not merged into an inverse collection on `Flight`.
+- **`GET /api/flights` requires `origin`, `destination`, AND `date` — all three, not an optional combinable filter set.** This is a fixed-route-on-a-day search (like a real flight search), not a flexible query. Missing any of the three, or an unparseable `date`, or an `origin`/`destination` outside the `AirportCode` enum, all return `400` with `{"error": "..."}`. `FlightRepository::search()`'s signature reflects this: `AirportCode $origin, AirportCode $destination, \DateTimeImmutable $date` — no nullable params.
+- **`FlightRepository::get(string $id): Flight` always returns a `Flight` or throws `FlightNotFoundException`** — never returns `null`. This avoids null-checks at call sites; the controller catches the exception once and converts it to a 404. There is no `find()` method.
 - No pagination on `GET /api/flights`.
 - Error response shape: `{"error": "..."}`, matching the stub's existing convention.
 - `GET /health` contract unchanged: `{"status": "ok"}`.
@@ -495,12 +497,13 @@ git commit -m "Add Doctrine ORM/Migrations, serializer, and uid packages"
 
 **Files:**
 - Create: `src/ValueObject/AirportCode.php`, `src/ValueObject/Money.php`
+- Create: `src/Exception/FlightNotFoundException.php`
 - Create: `src/Entity/Flight.php`, `src/Entity/Seat.php`
-- Create: `src/Repository/FlightRepository.php`, `src/Repository/SeatRepository.php` (plain DI services with just `find()`/a constructor for now — query methods come in Task 5)
+- Create: `src/Repository/FlightRepository.php` (plain DI service with `get()` for now — `search()` comes in Task 5), `src/Repository/SeatRepository.php` (plain DI service, just a constructor for now — `findByFlight()` comes in Task 5)
 - Create: `migrations/VersionXXXXXXXXXXXXXX.php` (generated, exact filename depends on timestamp)
 
 **Interfaces:**
-- Produces: `Flight` (public readonly properties: `id: string`, `flightNumber: string`, `origin: AirportCode`, `destination: AirportCode`, `departureTime: \DateTimeImmutable`, `arrivalTime: \DateTimeImmutable`, `price: Money`) and `Seat` (public readonly properties: `id: string`, `flight: Flight` [marked `#[Ignore]`], `seatNumber: string`, `class: string`, `available: bool`). No getters — Task 5's repositories and Task 6's controllers, and the serializer, all read these properties directly. `FlightRepository::find(string $id): ?Flight` is available immediately for Task 6.
+- Produces: `Flight` (public readonly properties: `id: string`, `flightNumber: string`, `origin: AirportCode`, `destination: AirportCode`, `departureTime: \DateTimeImmutable`, `arrivalTime: \DateTimeImmutable`, `price: Money`) and `Seat` (public readonly properties: `id: string`, `flight: Flight` [marked `#[Ignore]`], `seatNumber: string`, `class: string`, `available: bool`). No getters — Task 5's repositories and Task 6's controllers, and the serializer, all read these properties directly. `FlightRepository::get(string $id): Flight` is available immediately for Task 6 — it throws `FlightNotFoundException` rather than returning `null`.
 
 - [ ] **Step 1: Create `src/ValueObject/AirportCode.php`**
 
@@ -549,7 +552,23 @@ final class Money
 }
 ```
 
-- [ ] **Step 3: Create `src/Repository/FlightRepository.php`**
+- [ ] **Step 3: Create `src/Exception/FlightNotFoundException.php`**
+
+```php
+<?php
+
+namespace AeroNuk\FlightSearch\Exception;
+
+final class FlightNotFoundException extends \RuntimeException
+{
+    public function __construct(string $id)
+    {
+        parent::__construct(sprintf('Flight "%s" not found.', $id));
+    }
+}
+```
+
+- [ ] **Step 4: Create `src/Repository/FlightRepository.php`**
 
 ```php
 <?php
@@ -557,6 +576,7 @@ final class Money
 namespace AeroNuk\FlightSearch\Repository;
 
 use AeroNuk\FlightSearch\Entity\Flight;
+use AeroNuk\FlightSearch\Exception\FlightNotFoundException;
 use Doctrine\ORM\EntityManagerInterface;
 
 class FlightRepository
@@ -565,14 +585,20 @@ class FlightRepository
     {
     }
 
-    public function find(string $id): ?Flight
+    public function get(string $id): Flight
     {
-        return $this->em->find(Flight::class, $id);
+        $flight = $this->em->find(Flight::class, $id);
+
+        if ($flight === null) {
+            throw new FlightNotFoundException($id);
+        }
+
+        return $flight;
     }
 }
 ```
 
-- [ ] **Step 4: Create `src/Repository/SeatRepository.php`**
+- [ ] **Step 5: Create `src/Repository/SeatRepository.php`**
 
 ```php
 <?php
@@ -589,7 +615,7 @@ class SeatRepository
 }
 ```
 
-- [ ] **Step 5: Create `src/Entity/Flight.php`**
+- [ ] **Step 6: Create `src/Entity/Flight.php`**
 
 ```php
 <?php
@@ -634,7 +660,7 @@ class Flight
 }
 ```
 
-- [ ] **Step 6: Create `src/Entity/Seat.php`**
+- [ ] **Step 7: Create `src/Entity/Seat.php`**
 
 ```php
 <?php
@@ -671,7 +697,7 @@ class Seat
 }
 ```
 
-- [ ] **Step 7: Generate and review the migration**
+- [ ] **Step 8: Generate and review the migration**
 
 ```bash
 docker compose exec aeronuk-flight-search php bin/console make:migration --no-interaction
@@ -679,14 +705,14 @@ docker compose exec aeronuk-flight-search php bin/console make:migration --no-in
 
 Expected: a new file under `migrations/`. Open it and confirm it creates a `flight` table (columns: `id`, `flight_number`, `origin`, `destination`, `departure_time`, `arrival_time`, `price` decimal, `currency` varchar(3) — the last two from the `Money` embeddable, mapped onto the same table) and a `seat` table (columns: `id`, `flight_id` FK to `flight.id`, `seat_number`, `class`, `available`).
 
-- [ ] **Step 8: Run the migration in both dev and test**
+- [ ] **Step 9: Run the migration in both dev and test**
 
 ```bash
 docker compose exec aeronuk-flight-search php bin/console doctrine:migrations:migrate --no-interaction
 docker compose exec aeronuk-flight-search php bin/console doctrine:migrations:migrate --no-interaction --env=test
 ```
 
-- [ ] **Step 9: Verify the schema matches the mapping**
+- [ ] **Step 10: Verify the schema matches the mapping**
 
 ```bash
 docker compose exec aeronuk-flight-search php bin/console doctrine:schema:validate
@@ -694,11 +720,11 @@ docker compose exec aeronuk-flight-search php bin/console doctrine:schema:valida
 
 Expected: `[OK] The mapping files are correct.` and `[OK] The database schema is in sync with the mapping files.`
 
-- [ ] **Step 10: Commit**
+- [ ] **Step 11: Commit**
 
 ```bash
 git add -A
-git commit -m "Add AirportCode enum, Money VO, and Flight/Seat entities with migration"
+git commit -m "Add AirportCode enum, Money VO, FlightNotFoundException, and Flight/Seat entities with migration"
 ```
 
 ---
@@ -714,7 +740,7 @@ git commit -m "Add AirportCode enum, Money VO, and Flight/Seat entities with mig
 
 **Interfaces:**
 - Consumes: `Flight`, `Seat`, `AirportCode`, `Money` from Task 4.
-- Produces: `FlightRepository::search(?AirportCode $origin, ?AirportCode $destination, ?\DateTimeImmutable $date): Flight[]` and `SeatRepository::findByFlight(Flight $flight): Seat[]` — Task 6's controllers call both directly.
+- Produces: `FlightRepository::search(AirportCode $origin, AirportCode $destination, \DateTimeImmutable $date): Flight[]` (all three required — see Global Constraints) and `SeatRepository::findByFlight(Flight $flight): Seat[]` — Task 6's controllers call both directly.
 
 - [ ] **Step 1: Create the shared test helper `tests/ResetsDatabase.php`**
 
@@ -784,58 +810,25 @@ class FlightRepositoryTest extends KernelTestCase
         return $flight;
     }
 
-    public function testSearchWithNoFiltersReturnsAllFlights(): void
+    public function testSearchReturnsFlightsMatchingOriginDestinationAndDate(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
-        $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
+        $this->persistFlight('AN2', AirportCode::JFK, AirportCode::SFO, '2026-07-01 12:00:00');
+        $this->persistFlight('AN3', AirportCode::JFK, AirportCode::LAX, '2026-07-02 08:00:00');
 
-        $results = $this->repository->search(null, null, null);
-
-        self::assertCount(2, $results);
-    }
-
-    public function testSearchFiltersByOrigin(): void
-    {
-        $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
-        $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
-
-        $results = $this->repository->search(AirportCode::JFK, null, null);
+        $results = $this->repository->search(AirportCode::JFK, AirportCode::LAX, new \DateTimeImmutable('2026-07-01'));
 
         self::assertCount(1, $results);
         self::assertSame('AN1', $results[0]->flightNumber);
     }
 
-    public function testSearchFiltersByDestination(): void
+    public function testSearchReturnsEmptyArrayWhenNoFlightMatches(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
-        $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
 
-        $results = $this->repository->search(null, AirportCode::SFO, null);
+        $results = $this->repository->search(AirportCode::ORD, AirportCode::SFO, new \DateTimeImmutable('2026-07-01'));
 
-        self::assertCount(1, $results);
-        self::assertSame('AN2', $results[0]->flightNumber);
-    }
-
-    public function testSearchFiltersByDate(): void
-    {
-        $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
-        $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
-
-        $results = $this->repository->search(null, null, new \DateTimeImmutable('2026-07-02'));
-
-        self::assertCount(1, $results);
-        self::assertSame('AN2', $results[0]->flightNumber);
-    }
-
-    public function testSearchCombinesFilters(): void
-    {
-        $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
-        $this->persistFlight('AN2', AirportCode::JFK, AirportCode::SFO, '2026-07-01 12:00:00');
-
-        $results = $this->repository->search(AirportCode::JFK, AirportCode::SFO, new \DateTimeImmutable('2026-07-01'));
-
-        self::assertCount(1, $results);
-        self::assertSame('AN2', $results[0]->flightNumber);
+        self::assertCount(0, $results);
     }
 }
 ```
@@ -850,7 +843,7 @@ Expected: FAIL — `Call to undefined method AeroNuk\FlightSearch\Repository\Fli
 
 - [ ] **Step 4: Implement `FlightRepository::search()`**
 
-Replace the contents of `src/Repository/FlightRepository.php` with:
+Add the method to `src/Repository/FlightRepository.php` (alongside the `get()` method from Task 4), so the full file reads:
 
 ```php
 <?php
@@ -858,6 +851,7 @@ Replace the contents of `src/Repository/FlightRepository.php` with:
 namespace AeroNuk\FlightSearch\Repository;
 
 use AeroNuk\FlightSearch\Entity\Flight;
+use AeroNuk\FlightSearch\Exception\FlightNotFoundException;
 use AeroNuk\FlightSearch\ValueObject\AirportCode;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -867,36 +861,35 @@ class FlightRepository
     {
     }
 
-    public function find(string $id): ?Flight
+    public function get(string $id): Flight
     {
-        return $this->em->find(Flight::class, $id);
+        $flight = $this->em->find(Flight::class, $id);
+
+        if ($flight === null) {
+            throw new FlightNotFoundException($id);
+        }
+
+        return $flight;
     }
 
     /**
      * @return Flight[]
      */
-    public function search(?AirportCode $origin, ?AirportCode $destination, ?\DateTimeImmutable $date): array
+    public function search(AirportCode $origin, AirportCode $destination, \DateTimeImmutable $date): array
     {
-        $qb = $this->em->createQueryBuilder()
+        return $this->em->createQueryBuilder()
             ->select('f')
             ->from(Flight::class, 'f')
-            ->orderBy('f.departureTime', 'ASC');
-
-        if ($origin !== null) {
-            $qb->andWhere('f.origin = :origin')->setParameter('origin', $origin);
-        }
-
-        if ($destination !== null) {
-            $qb->andWhere('f.destination = :destination')->setParameter('destination', $destination);
-        }
-
-        if ($date !== null) {
-            $qb->andWhere('f.departureTime BETWEEN :start AND :end')
-                ->setParameter('start', $date->setTime(0, 0, 0))
-                ->setParameter('end', $date->setTime(23, 59, 59));
-        }
-
-        return $qb->getQuery()->getResult();
+            ->andWhere('f.origin = :origin')
+            ->andWhere('f.destination = :destination')
+            ->andWhere('f.departureTime BETWEEN :start AND :end')
+            ->setParameter('origin', $origin)
+            ->setParameter('destination', $destination)
+            ->setParameter('start', $date->setTime(0, 0, 0))
+            ->setParameter('end', $date->setTime(23, 59, 59))
+            ->orderBy('f.departureTime', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 }
 ```
@@ -1036,7 +1029,7 @@ git commit -m "Add FlightRepository::search() and SeatRepository::findByFlight()
 - Create: `tests/Controller/FlightControllerTest.php`
 
 **Interfaces:**
-- Consumes: `FlightRepository::search()`, `SeatRepository::findByFlight()` from Task 5; `AirportCode` from Task 4; `SerializerInterface` from `symfony/serializer-pack` (Task 3).
+- Consumes: `FlightRepository::get()`/`search()`, `SeatRepository::findByFlight()` from Task 4–5; `AirportCode` from Task 4; `FlightNotFoundException` from Task 4; `SerializerInterface` from `symfony/serializer-pack` (Task 3).
 - Produces: routes `flights_search` (`GET /api/flights`) and `flights_seats` (`GET /api/flights/{id}/seats`).
 
 - [ ] **Step 1: Write the failing test `tests/Controller/FlightControllerTest.php`**
@@ -1087,25 +1080,14 @@ class FlightControllerTest extends WebTestCase
         return $flight;
     }
 
-    public function testSearchWithNoFiltersReturnsAllFlights(): void
+    public function testSearchReturnsMatchingFlights(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
         $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
 
-        $this->client->request('GET', '/api/flights');
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=2026-07-01');
 
         self::assertResponseIsSuccessful();
-        $data = json_decode($this->client->getResponse()->getContent(), true);
-        self::assertCount(2, $data);
-    }
-
-    public function testSearchByOriginAndDestination(): void
-    {
-        $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
-        $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
-
-        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX');
-
         $data = json_decode($this->client->getResponse()->getContent(), true);
         self::assertCount(1, $data);
         self::assertSame('AN1', $data[0]['flightNumber']);
@@ -1115,15 +1097,42 @@ class FlightControllerTest extends WebTestCase
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
 
-        $this->client->request('GET', '/api/flights');
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=2026-07-01');
 
         $data = json_decode($this->client->getResponse()->getContent(), true);
         self::assertSame(['amount' => '199.99', 'currency' => 'USD'], $data[0]['price']);
     }
 
+    public function testSearchRequiresOrigin(): void
+    {
+        $this->client->request('GET', '/api/flights?destination=LAX&date=2026-07-01');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayHasKey('error', $data);
+    }
+
+    public function testSearchRequiresDestination(): void
+    {
+        $this->client->request('GET', '/api/flights?origin=JFK&date=2026-07-01');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayHasKey('error', $data);
+    }
+
+    public function testSearchRequiresDate(): void
+    {
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = json_decode($this->client->getResponse()->getContent(), true);
+        self::assertArrayHasKey('error', $data);
+    }
+
     public function testSearchWithInvalidDateReturns400(): void
     {
-        $this->client->request('GET', '/api/flights?date=not-a-date');
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=not-a-date');
 
         self::assertResponseStatusCodeSame(400);
         $data = json_decode($this->client->getResponse()->getContent(), true);
@@ -1132,7 +1141,7 @@ class FlightControllerTest extends WebTestCase
 
     public function testSearchWithUnknownAirportCodeReturns400(): void
     {
-        $this->client->request('GET', '/api/flights?origin=ZZZ');
+        $this->client->request('GET', '/api/flights?origin=ZZZ&destination=LAX&date=2026-07-01');
 
         self::assertResponseStatusCodeSame(400);
         $data = json_decode($this->client->getResponse()->getContent(), true);
@@ -1180,6 +1189,7 @@ Expected: FAIL — 404 for `/api/flights` (no route defined yet).
 
 namespace AeroNuk\FlightSearch\Controller;
 
+use AeroNuk\FlightSearch\Exception\FlightNotFoundException;
 use AeroNuk\FlightSearch\Repository\FlightRepository;
 use AeroNuk\FlightSearch\Repository\SeatRepository;
 use AeroNuk\FlightSearch\ValueObject\AirportCode;
@@ -1200,31 +1210,34 @@ class FlightController
     #[Route('/api/flights', name: 'flights_search', methods: ['GET'])]
     public function search(Request $request): JsonResponse
     {
-        $origin = null;
-        if (($originParam = $request->query->get('origin')) !== null) {
-            $origin = AirportCode::tryFrom(strtoupper($originParam));
-            if ($origin === null) {
-                return new JsonResponse(['error' => 'origin must be a known 3-letter airport code'], 400);
-            }
+        $originParam = $request->query->get('origin');
+        if ($originParam === null) {
+            return new JsonResponse(['error' => 'origin is required'], 400);
+        }
+        $origin = AirportCode::tryFrom(strtoupper($originParam));
+        if ($origin === null) {
+            return new JsonResponse(['error' => 'origin must be a known 3-letter airport code'], 400);
         }
 
-        $destination = null;
-        if (($destinationParam = $request->query->get('destination')) !== null) {
-            $destination = AirportCode::tryFrom(strtoupper($destinationParam));
-            if ($destination === null) {
-                return new JsonResponse(['error' => 'destination must be a known 3-letter airport code'], 400);
-            }
+        $destinationParam = $request->query->get('destination');
+        if ($destinationParam === null) {
+            return new JsonResponse(['error' => 'destination is required'], 400);
+        }
+        $destination = AirportCode::tryFrom(strtoupper($destinationParam));
+        if ($destination === null) {
+            return new JsonResponse(['error' => 'destination must be a known 3-letter airport code'], 400);
         }
 
-        $date = null;
-        if (($dateParam = $request->query->get('date')) !== null) {
-            $date = \DateTimeImmutable::createFromFormat('Y-m-d', $dateParam);
-            if ($date === false) {
-                return new JsonResponse(['error' => 'date must be in YYYY-MM-DD format'], 400);
-            }
+        $dateParam = $request->query->get('date');
+        if ($dateParam === null) {
+            return new JsonResponse(['error' => 'date is required'], 400);
+        }
+        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $dateParam);
+        if ($date === false) {
+            return new JsonResponse(['error' => 'date must be in YYYY-MM-DD format'], 400);
         }
 
-        $flights = $this->flightRepository->search($origin, $destination, $date ?: null);
+        $flights = $this->flightRepository->search($origin, $destination, $date);
 
         return JsonResponse::fromJsonString($this->serializer->serialize($flights, 'json'));
     }
@@ -1232,9 +1245,9 @@ class FlightController
     #[Route('/api/flights/{id}/seats', name: 'flights_seats', methods: ['GET'])]
     public function seats(string $id): JsonResponse
     {
-        $flight = $this->flightRepository->find($id);
-
-        if ($flight === null) {
+        try {
+            $flight = $this->flightRepository->get($id);
+        } catch (FlightNotFoundException) {
             return new JsonResponse(['error' => 'flight not found'], 404);
         }
 
@@ -1251,7 +1264,7 @@ class FlightController
 docker compose exec aeronuk-flight-search php bin/phpunit tests/Controller/FlightControllerTest.php
 ```
 
-Expected: all 7 tests pass. (`testSeatsHappyPath`'s `assertArrayNotHasKey('flight', ...)` confirms the `#[Ignore]` attribute on the `Seat::$flight` property from Task 4 is working; `testFlightPriceSerializesAsNestedMoneyObject` confirms the `Money` embeddable serializes as a nested object.)
+Expected: all 8 tests pass. (`testSeatsHappyPath`'s `assertArrayNotHasKey('flight', ...)` confirms the `#[Ignore]` attribute on the `Seat::$flight` property from Task 4 is working; `testFlightPriceSerializesAsNestedMoneyObject` confirms the `Money` embeddable serializes as a nested object; `testSearchRequires*` confirm `origin`/`destination`/`date` are all mandatory.)
 
 - [ ] **Step 5: Commit**
 
@@ -1554,10 +1567,10 @@ docker compose exec aeronuk-flight-search php bin/console dbal:run-sql "DELETE F
 docker compose restart aeronuk-flight-search
 sleep 5
 docker compose logs aeronuk-flight-search --tail 20
-curl -s http://localhost:8000/api/flights | head -c 200
+curl -s "http://localhost:8000/api/flights?origin=JFK&destination=LAX&date=2026-07-01" | head -c 200
 ```
 
-Expected: the logs show `Loading fixtures (environment: dev)...`, and the curl output is a JSON array of 5 flights, each with a nested `"price": {"amount": ..., "currency": ...}`.
+Expected: the logs show `Loading fixtures (environment: dev)...`, and the curl output is a JSON array containing the `AN101` fixture flight, with a nested `"price": {"amount": ..., "currency": ...}`.
 
 - [ ] **Step 8: Commit**
 
@@ -1588,13 +1601,13 @@ Flight search service for the AeroNuk platform. Symfony 8.1 + PHP 8.4 + MySQL 8.
 
 ### `GET /api/flights`
 
-Query params, all optional and combinable:
+Query params, **all three required** — this is a fixed route-on-a-day search, not a flexible filter:
 
 - `origin` — 3-letter airport code (one of `JFK`, `LAX`, `ORD`, `SFO`, `LHR`, `NRT`), case-insensitive
 - `destination` — same closed set as `origin`
 - `date` — `YYYY-MM-DD`, matches flights departing on that calendar date
 
-Returns `400` with `{"error": "..."}` for a malformed date or an airport code outside the known set.
+Returns `400` with `{"error": "..."}` if any of the three is missing, if `date` is malformed, or if `origin`/`destination` is outside the known airport set.
 
 ```bash
 curl "http://localhost:8000/api/flights?origin=JFK&destination=LAX&date=2026-07-01"
@@ -1714,7 +1727,14 @@ dev commands.
 - **`Seat::$flight` uses `fetch: 'EAGER'`**, not Doctrine's default lazy
   proxy loading — proxies have known bugs with `readonly` properties: eager
   loading sidesteps that risk, and is cheap since a seat always has exactly
-  one flight.
+  one flight. This is one-directional only — it does **not** make "find
+  seats for a flight" automatic, so `SeatRepository::findByFlight()` stays.
+  Deliberately not replaced with an inverse `Flight::$seats` collection.
+- **`GET /api/flights` requires `origin`, `destination`, AND `date`** — not
+  an optional combinable filter set. Missing any one returns `400`.
+- **`FlightRepository::get(string $id): Flight` always returns a `Flight`
+  or throws `FlightNotFoundException`** — never `null`. There is no
+  `find()` method; this avoids null-checks at call sites.
 - **`.env` is committed, not gitignored** — this differs from the simpler
   convention the other four AeroNuk services use (`.env.example` committed,
   `.env` gitignored). This service follows Symfony's own convention instead:
@@ -1741,8 +1761,8 @@ git commit -m "Add service-level README.md and CLAUDE.md"
 
 ## Self-Review
 
-**Spec coverage:** Symfony 8.1/PHP 8.4/MySQL 8.4 (Tasks 1–3); `AeroNuk\FlightSearch` namespace retarget (Task 1); Docker via dunglas/symfony-docker pinned to 8.4 (Task 2); entrypoint auto-migrations (Task 2, inherited from official script) + guarded fixture auto-load (Task 8); `AirportCode`/`Money` VOs + `Flight`/`Seat` entities + migration (Task 4); plain-DI repositories, no getters, EAGER fetch (Task 4–5); hand-rolled controllers + Doctrine (Tasks 5–6); search filters incl. enum-validated airports and date-as-calendar-day (Task 5–6); 404/400 error shapes (Task 6); `/health` unchanged contract (Task 7); fixtures (Task 8); functional tests throughout (Tasks 5–8); README.md + CLAUDE.md (Task 9). No spec or Global Constraints item is without a task.
+**Spec coverage:** Symfony 8.1/PHP 8.4/MySQL 8.4 (Tasks 1–3); `AeroNuk\FlightSearch` namespace retarget (Task 1); Docker via dunglas/symfony-docker pinned to 8.4 (Task 2); entrypoint auto-migrations (Task 2, inherited from official script) + guarded fixture auto-load (Task 8); `AirportCode`/`Money` VOs + `FlightNotFoundException` + `Flight`/`Seat` entities + migration (Task 4); plain-DI repositories, no getters, EAGER fetch, `get()`-throws-not-`find()`-returns-null (Task 4–5); hand-rolled controllers + Doctrine (Tasks 5–6); required (not optional) search params with enum-validated airports and date-as-calendar-day (Task 5–6); 404/400 error shapes (Task 6); `/health` unchanged contract (Task 7); fixtures (Task 8); functional tests throughout (Tasks 5–8); README.md + CLAUDE.md (Task 9). No spec or Global Constraints item is without a task.
 
 **Placeholder scan:** no TBD/TODO; every step has complete, runnable code or exact commands with expected output.
 
-**Type consistency:** `Flight::$id`/`Seat::$id` are `string` everywhere (repositories, controllers, tests). `FlightRepository::search()` signature (`?AirportCode, ?AirportCode, ?\DateTimeImmutable`) matches Task 6's controller call site, which builds `AirportCode` instances via `tryFrom()` before calling it. `SeatRepository::findByFlight(Flight $flight)` matches the controller's `seats()` usage. `Money` and `AirportCode` constructors/cases are used identically across Tasks 4, 5, 6, and 8 (fixtures and tests both pass `(string) Uuid::v7()` as `$id`). Every namespace declaration and `use` statement consistently uses `AeroNuk\FlightSearch\...` instead of the Symfony default `App\...`.
+**Type consistency:** `Flight::$id`/`Seat::$id` are `string` everywhere (repositories, controllers, tests). `FlightRepository::search()` signature (`AirportCode, AirportCode, \DateTimeImmutable`, all required, no nullables) matches Task 6's controller call site, which builds `AirportCode`/`\DateTimeImmutable` instances and 400s before ever calling it. `FlightRepository::get(string $id): Flight` (throws `FlightNotFoundException`, Task 4) matches the controller's `seats()` try/catch (Task 6) — no code path anywhere still calls a `find()` method or null-checks a `Flight`. `SeatRepository::findByFlight(Flight $flight)` matches the controller's `seats()` usage. `Money` and `AirportCode` constructors/cases are used identically across Tasks 4, 5, 6, and 8 (fixtures and tests both pass `(string) Uuid::v7()` as `$id`). Every namespace declaration and `use` statement consistently uses `AeroNuk\FlightSearch\...` instead of the Symfony default `App\...`.
