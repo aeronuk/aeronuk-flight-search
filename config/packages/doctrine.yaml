@@ -17,8 +17,8 @@ doctrine:
             AeroNukFlightSearch:
                 type: attribute
                 is_bundle: false
-                dir: '%kernel.project_dir%/src/Entity'
-                prefix: 'AeroNuk\FlightSearch\Entity'
+                dir: '%kernel.project_dir%/src'
+                prefix: 'AeroNuk\FlightSearch'
                 alias: AeroNukFlightSearch
 
 when@prod:
