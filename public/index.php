@@ -1,14 +1,9 @@
 <?php
 
-$uri = strtok($_SERVER['REQUEST_URI'], '?');
+use AeroNuk\FlightSearch\Kernel;
 
-header('Content-Type: application/json');
+require_once dirname(__DIR__).'/vendor/autoload_runtime.php';
 
-if ($uri === '/health') {
-    http_response_code(200);
-    echo json_encode(['status' => 'ok']);
-    exit;
-}
-
-http_response_code(404);
-echo json_encode(['error' => 'not implemented']);
+return static function (array $context) {
+    return new Kernel($context['APP_ENV'], (bool) $context['APP_DEBUG']);
+};
