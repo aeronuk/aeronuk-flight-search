@@ -25,6 +25,7 @@
 - **`Seat`'s `ManyToOne` to `Flight` uses `fetch: 'EAGER'`.** Doctrine lazy-loads associations via proxy objects, and proxies have known bugs interacting with `readonly` properties (unset-on-proxy-construction errors). Eager-loading a `Flight` via a JOIN whenever a `Seat` loads sidesteps that risk entirely — cheap anyway, since a seat always belongs to exactly one flight. This is a one-directional decision: it does **not** make looking up "seats for a flight" automatic (that's the opposite direction), so `SeatRepository::findByFlight()` stays — deliberately not merged into an inverse collection on `Flight`.
 - **`GET /api/flights` requires `origin`, `destination`, AND `date` — all three, not an optional combinable filter set.** This is a fixed-route-on-a-day search (like a real flight search), not a flexible query. Missing any of the three, or an unparseable `date`, or an `origin`/`destination` outside the `AirportCode` enum, all return `400` with `{"error": "..."}`. `FlightRepository::search()`'s signature reflects this: `AirportCode $origin, AirportCode $destination, \DateTimeImmutable $date` — no nullable params.
 - **`FlightRepository::get(string $id): Flight` always returns a `Flight` or throws `FlightNotFoundException`** — never returns `null`. This avoids null-checks at call sites; the controller catches the exception once and converts it to a 404. There is no `find()` method.
+- **Seat numbers are zero-padded to 2 digits (`01A`, not `1A`)**, in both tests and fixtures. `SeatRepository::findByFlight()` orders by `seatNumber ASC`, a plain lexicographic string sort — without zero-padding, `'12A' < '1A'` lexicographically, which breaks natural seat order for any flight with 10+ rows. Zero-padding sidesteps that without needing a natural-sort SQL expression. Found and fixed during Task 5 execution (the original plan text used unpadded `'1A'`/`'12A'` together, which was a real bug, not just test-data noise) — also corrected in Task 8's fixtures, which had the identical pattern.
 - No pagination on `GET /api/flights`.
 - Error response shape: `{"error": "..."}`, matching the stub's existing convention.
 - `GET /health` contract unchanged: `{"status": "ok"}`.
@@ -943,9 +944,9 @@ class SeatRepositoryTest extends KernelTestCase
         $this->em->persist($flightA);
         $this->em->persist($flightB);
 
-        $this->em->persist(new Seat((string) Uuid::v7(), $flightA, '1A', 'business'));
+        $this->em->persist(new Seat((string) Uuid::v7(), $flightA, '01A', 'business'));
         $this->em->persist(new Seat((string) Uuid::v7(), $flightA, '12A', 'economy'));
-        $this->em->persist(new Seat((string) Uuid::v7(), $flightB, '1A', 'business'));
+        $this->em->persist(new Seat((string) Uuid::v7(), $flightB, '01A', 'business'));
         $this->em->flush();
         $flightAId = $flightA->id;
         $this->em->clear();
@@ -954,7 +955,7 @@ class SeatRepositoryTest extends KernelTestCase
         $results = $this->repository->findByFlight($reloadedFlightA);
 
         self::assertCount(2, $results);
-        self::assertSame('1A', $results[0]->seatNumber);
+        self::assertSame('01A', $results[0]->seatNumber);
         self::assertSame('12A', $results[1]->seatNumber);
         self::assertSame('AN1', $results[0]->flight->flightNumber);
     }
@@ -1401,7 +1402,7 @@ class FlightFixtures extends Fixture
             );
             $manager->persist($flight);
 
-            foreach (['1A' => 'business', '12A' => 'economy', '12B' => 'economy', '12C' => 'economy'] as $seatNumber => $class) {
+            foreach (['01A' => 'business', '12A' => 'economy', '12B' => 'economy', '12C' => 'economy'] as $seatNumber => $class) {
                 $manager->persist(new Seat((string) Uuid::v7(), $flight, $seatNumber, $class));
             }
         }
