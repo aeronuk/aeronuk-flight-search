@@ -44,7 +44,7 @@ class LoadFixturesIfEmptyCommand extends Command
             return Command::FAILURE;
         }
 
-        $fixturesInput = new ArrayInput(['--no-interaction' => true]);
+        $fixturesInput = new ArrayInput([]);
         // ArrayInput does not special-case --no-interaction the way Application::doRun() does when
         // parsing real argv, so it stays interactive unless explicitly told otherwise. Without this,
         // doctrine:fixtures:load's purge confirmation prompt blocks (and silently defaults to "no" in

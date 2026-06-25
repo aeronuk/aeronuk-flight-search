@@ -12,6 +12,10 @@
 /.worktrees/
 .DS_Store
 
+# Some contributors' global gitignore has a blanket *.sql rule; these are
+# committed seed/init scripts, not local dump files.
+!/mysql-init/*.sql
+
 ###> phpunit/phpunit ###
 /phpunit.xml
 /.phpunit.cache/
