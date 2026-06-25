@@ -90,4 +90,4 @@ docker compose exec aeronuk-flight-search php bin/console make:migration
 | Variable | Purpose | Set in |
 |----------|---------|--------|
 | `DATABASE_URL` | MySQL connection string | `.env` (dev), `.env.test` (test) |
-| `APP_ENV` | Symfony environment | `docker-compose.yml` (`environment:` key) and `.env.dev`/`.env.test` |
+| `APP_ENV` | Symfony environment | Default `dev` in `.env`; redundantly set to `dev` in `docker-compose.yml`'s `environment:` key; forced to `test` for the test suite via `phpunit.dist.xml`'s `<server name="APP_ENV" value="test" force="true">` |
