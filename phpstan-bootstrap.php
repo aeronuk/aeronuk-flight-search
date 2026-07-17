@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+// Wired up as parameters.doctrine.objectManagerLoader in phpstan.neon.dist —
+// a phpstan-doctrine feature (not phpstan-symfony), which uses the real
+// EntityManager to type-check DQL/QueryBuilder result types instead of
+// falling back to `mixed`. See https://github.com/phpstan/phpstan-doctrine#configuration
+
 use AeroNuk\FlightSearch\Kernel;
 use Symfony\Component\Dotenv\Dotenv;
 
