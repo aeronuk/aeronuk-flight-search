@@ -60,14 +60,8 @@ jobs:
           image: "${{ needs.build.outputs.image }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "Validate composer.json"
-        run: "docker compose exec -T aeronuk-flight-search composer validate --strict"
-
-      - name: "Check composer.json is normalized"
-        run: "docker compose exec -T aeronuk-flight-search composer normalize --dry-run"
-
-      - name: "Check for undeclared dependencies"
-        run: "docker compose exec -T aeronuk-flight-search vendor/bin/composer-require-checker check --config-file=composer-require-checker.json"
+      - name: "Composer lint"
+        run: "make composer-lint"
 
       - name: "Stop stack"
         if: always()
@@ -90,8 +84,8 @@ jobs:
           image: "${{ needs.build.outputs.image }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "phpcs (Doctrine coding standard)"
-        run: "docker compose exec -T aeronuk-flight-search vendor/bin/phpcs"
+      - name: "Coding standards"
+        run: "make cs"
 
       - name: "Stop stack"
         if: always()
@@ -114,8 +108,8 @@ jobs:
           image: "${{ needs.build.outputs.image }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "phpstan (max level)"
-        run: "docker compose exec -T aeronuk-flight-search vendor/bin/phpstan analyse --memory-limit=1G"
+      - name: "Static analysis"
+        run: "make stan"
 
       - name: "Stop stack"
         if: always()
@@ -139,7 +133,7 @@ jobs:
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: "PHPUnit"
-        run: "docker compose exec -T aeronuk-flight-search php bin/phpunit"
+        run: "make test"
 
       - name: "Stop stack"
         if: always()

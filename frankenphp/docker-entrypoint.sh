@@ -2,6 +2,11 @@
 set -e
 
 if [ "$1" = 'frankenphp' ] || [ "$1" = 'php' ] || [ "$1" = 'bin/console' ]; then
+	# The bind-mounted app directory is owned by the host user (or, in CI, the
+	# runner user), not the container's user, which trips git's ownership check
+	# the moment composer/Symfony Flex shell out to git during install.
+	git config --global --add safe.directory /app
+
 	if [ -z "$(ls -A 'vendor/' 2>/dev/null)" ]; then
 		composer install --prefer-dist --no-progress --no-interaction
 	fi

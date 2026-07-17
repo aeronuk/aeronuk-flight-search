@@ -152,6 +152,7 @@ src/
 ```bash
 # From this repo's directory:
 docker compose up --build
+# equivalently: make up
 
 # Service available at:
 curl http://localhost:8000/health
@@ -161,12 +162,19 @@ curl "http://localhost:8000/api/flights?origin=LHR&destination=JFK&date=2025-06-
 ## Tests
 
 ```bash
-docker compose exec aeronuk-flight-search php bin/phpunit
+make test
 ```
 
-Tests use the `flight_search_test` database (separate from dev). The test
-DB schema is created automatically by the test bootstrap via Doctrine
-migrations.
+Tests use the `flight_search_test` database (separate from dev). Nothing
+creates that schema automatically on a fresh volume — `docker-entrypoint.sh`
+only migrates the **dev** database on container start (hardcoded to `.env`,
+under `APP_ENV=dev`), and `tests/bootstrap.php` doesn't touch the database at
+all. `make test` (see `Makefile`) explicitly drops, recreates, and migrates
+`flight_search_test` via `--env=test` before running `bin/phpunit`, mirroring
+the pattern from a sibling project. Running `php bin/phpunit` directly
+(skipping `make test`) will fail with "table doesn't exist" on a fresh
+volume — this bit us once already; don't reach for `docker compose exec ...
+php bin/phpunit` as a shortcut.
 
 ## CI
 
@@ -198,6 +206,12 @@ Each job (including the lint-only ones) spins up the **full** compose stack
 (app + MySQL), not a bare `docker run`, so that all four jobs reuse the
 exact same entrypoint bootstrap logic already relied on for local dev/tests,
 rather than reimplementing composer-install/migration steps per job.
+
+The actual tool invocations live in the root `Makefile` (`make cs`, `make
+stan`, `make composer-lint`, `make test`), not inline in `ci.yml` — the
+workflow just calls `make <target>` after bootstrapping the stack. This
+keeps the exact same command available for local use (`make test` is the
+documented way to run tests — see below) and in CI, so the two never drift.
 
 Tooling:
 - **`doctrine/coding-standard`** (PHP_CodeSniffer, not PHP-CS-Fixer — the
