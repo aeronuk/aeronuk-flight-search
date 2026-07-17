@@ -1,12 +1,16 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\Tests\Controller;
 
 use AeroNuk\FlightSearch\Entity\Flight;
 use AeroNuk\FlightSearch\Entity\Seat;
+use AeroNuk\FlightSearch\Tests\DecodesJsonResponse;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
 use AeroNuk\FlightSearch\ValueObject\AirportCode;
 use AeroNuk\FlightSearch\ValueObject\Money;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -14,6 +18,7 @@ use Symfony\Component\Uid\Uuid;
 
 class FlightControllerTest extends WebTestCase
 {
+    use DecodesJsonResponse;
     use ResetsDatabase;
 
     private KernelBrowser $client;
@@ -22,19 +27,23 @@ class FlightControllerTest extends WebTestCase
     protected function setUp(): void
     {
         $this->client = static::createClient();
-        $this->em = static::getContainer()->get(EntityManagerInterface::class);
+        $this->em     = static::getContainer()->get(EntityManagerInterface::class);
         $this->resetDatabase($this->em);
     }
 
-    private function persistFlight(string $number, AirportCode $origin, AirportCode $destination, string $departure): Flight
-    {
+    private function persistFlight(
+        string $number,
+        AirportCode $origin,
+        AirportCode $destination,
+        string $departure,
+    ): Flight {
         $flight = new Flight(
             (string) Uuid::v7(),
             $number,
             $origin,
             $destination,
-            new \DateTimeImmutable($departure),
-            new \DateTimeImmutable($departure . ' +2 hours'),
+            new DateTimeImmutable($departure),
+            new DateTimeImmutable($departure . ' +2 hours'),
             new Money('199.99', 'USD'),
         );
         $this->em->persist($flight);
@@ -51,8 +60,9 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=2026-07-01');
 
         self::assertResponseIsSuccessful();
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertCount(1, $data);
+        self::assertIsArray($data[0]);
         self::assertSame('AN1', $data[0]['flightNumber']);
     }
 
@@ -62,7 +72,8 @@ class FlightControllerTest extends WebTestCase
 
         $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=2026-07-01');
 
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
+        self::assertIsArray($data[0]);
         self::assertSame(['amount' => '199.99', 'currency' => 'USD'], $data[0]['price']);
     }
 
@@ -71,7 +82,7 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights?destination=LAX&date=2026-07-01');
 
         self::assertResponseStatusCodeSame(400);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 
@@ -80,7 +91,7 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights?origin=JFK&date=2026-07-01');
 
         self::assertResponseStatusCodeSame(400);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 
@@ -89,7 +100,7 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX');
 
         self::assertResponseStatusCodeSame(400);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 
@@ -98,7 +109,7 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=not-a-date');
 
         self::assertResponseStatusCodeSame(400);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 
@@ -107,7 +118,7 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights?origin=ZZZ&destination=LAX&date=2026-07-01');
 
         self::assertResponseStatusCodeSame(400);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 
@@ -120,8 +131,9 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights/' . $flight->id . '/seats');
 
         self::assertResponseIsSuccessful();
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertCount(1, $data);
+        self::assertIsArray($data[0]);
         self::assertSame('12A', $data[0]['seatNumber']);
         self::assertArrayNotHasKey('flight', $data[0]);
     }
@@ -131,7 +143,7 @@ class FlightControllerTest extends WebTestCase
         $this->client->request('GET', '/api/flights/00000000-0000-0000-0000-000000000000/seats');
 
         self::assertResponseStatusCodeSame(404);
-        $data = json_decode($this->client->getResponse()->getContent(), true);
+        $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 }

@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\Repository;
 
 use AeroNuk\FlightSearch\Entity\Flight;
-use AeroNuk\FlightSearch\Exception\FlightNotFoundException;
+use AeroNuk\FlightSearch\Exception\FlightNotFound;
 use AeroNuk\FlightSearch\ValueObject\AirportCode;
+use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 
 class FlightRepository
@@ -18,16 +21,14 @@ class FlightRepository
         $flight = $this->em->find(Flight::class, $id);
 
         if ($flight === null) {
-            throw new FlightNotFoundException($id);
+            throw new FlightNotFound($id);
         }
 
         return $flight;
     }
 
-    /**
-     * @return Flight[]
-     */
-    public function search(AirportCode $origin, AirportCode $destination, \DateTimeImmutable $date): array
+    /** @return Flight[] */
+    public function search(AirportCode $origin, AirportCode $destination, DateTimeImmutable $date): array
     {
         return $this->em->createQueryBuilder()
             ->select('f')

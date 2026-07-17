@@ -1,0 +1,10 @@
+{
+    "symbol-whitelist": [
+        "Doctrine\\Persistence\\ObjectManager",
+        "Symfony\\Component\\DependencyInjection\\Attribute\\Autowire",
+        "Symfony\\Component\\HttpFoundation\\JsonResponse",
+        "Symfony\\Component\\HttpFoundation\\Request",
+        "Symfony\\Component\\HttpKernel\\Kernel",
+        "Symfony\\Component\\Routing\\Attribute\\Route"
+    ]
+}

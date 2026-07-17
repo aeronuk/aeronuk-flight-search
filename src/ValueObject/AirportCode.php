@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\ValueObject;
 
 enum AirportCode: string

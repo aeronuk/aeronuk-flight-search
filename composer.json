@@ -1,46 +1,42 @@
 {
-    "type": "project",
+    "name": "aeronuk/flight-search",
+    "description": "Flight search service for AeroNuk.",
     "license": "proprietary",
-    "minimum-stability": "stable",
-    "prefer-stable": true,
+    "type": "project",
     "require": {
         "php": ">=8.4",
         "ext-ctype": "*",
         "ext-iconv": "*",
         "doctrine/doctrine-bundle": "^3.2",
+        "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "doctrine/doctrine-migrations-bundle": "^4.0",
         "doctrine/orm": "^3.6",
         "phpdocumentor/reflection-docblock": "^6.0",
         "phpstan/phpdoc-parser": "^2.3",
-        "symfony/console": "8.1.*",
-        "symfony/dotenv": "8.1.*",
+        "symfony/console": "~8.1.0",
+        "symfony/dotenv": "~8.1.0",
         "symfony/flex": "^2",
-        "symfony/framework-bundle": "8.1.*",
-        "symfony/property-access": "8.1.*",
-        "symfony/property-info": "8.1.*",
-        "symfony/runtime": "8.1.*",
-        "symfony/serializer": "8.1.*",
-        "symfony/uid": "8.1.*",
-        "symfony/yaml": "8.1.*"
+        "symfony/framework-bundle": "~8.1.0",
+        "symfony/property-access": "~8.1.0",
+        "symfony/property-info": "~8.1.0",
+        "symfony/runtime": "~8.1.0",
+        "symfony/serializer": "~8.1.0",
+        "symfony/uid": "~8.1.0",
+        "symfony/yaml": "~8.1.0"
     },
-    "config": {
-        "allow-plugins": {
-            "php-http/discovery": true,
-            "symfony/flex": true,
-            "symfony/runtime": true
-        },
-        "bump-after-update": true,
-        "sort-packages": true
-    },
-    "autoload": {
-        "psr-4": {
-            "AeroNuk\\FlightSearch\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "AeroNuk\\FlightSearch\\Tests\\": "tests/"
-        }
+    "require-dev": {
+        "doctrine/coding-standard": "^14.0",
+        "ergebnis/composer-normalize": "^2.52",
+        "maglnet/composer-require-checker": "^4.24",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.2",
+        "phpstan/phpstan-doctrine": "^2.0",
+        "phpstan/phpstan-phpunit": "^2.0",
+        "phpstan/phpstan-symfony": "^2.0",
+        "phpunit/phpunit": "^13.2",
+        "symfony/browser-kit": "~8.1.0",
+        "symfony/css-selector": "~8.1.0",
+        "symfony/maker-bundle": "^1.67"
     },
     "replace": {
         "symfony/polyfill-ctype": "*",
@@ -54,20 +50,32 @@
         "symfony/polyfill-php83": "*",
         "symfony/polyfill-php84": "*"
     },
-    "scripts": {
-        "auto-scripts": {
-            "cache:clear": "symfony-cmd",
-            "assets:install %PUBLIC_DIR%": "symfony-cmd"
-        },
-        "post-install-cmd": [
-            "@auto-scripts"
-        ],
-        "post-update-cmd": [
-            "@auto-scripts"
-        ]
-    },
     "conflict": {
         "symfony/symfony": "*"
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "autoload": {
+        "psr-4": {
+            "AeroNuk\\FlightSearch\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AeroNuk\\FlightSearch\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "ergebnis/composer-normalize": true,
+            "php-http/discovery": true,
+            "phpstan/extension-installer": true,
+            "symfony/flex": true,
+            "symfony/runtime": true
+        },
+        "bump-after-update": true,
+        "sort-packages": true
     },
     "extra": {
         "symfony": {
@@ -75,11 +83,16 @@
             "require": "8.1.*"
         }
     },
-    "require-dev": {
-        "doctrine/doctrine-fixtures-bundle": "^4.3",
-        "phpunit/phpunit": "^13.2",
-        "symfony/browser-kit": "8.1.*",
-        "symfony/css-selector": "8.1.*",
-        "symfony/maker-bundle": "^1.67"
+    "scripts": {
+        "post-install-cmd": [
+            "@auto-scripts"
+        ],
+        "post-update-cmd": [
+            "@auto-scripts"
+        ],
+        "auto-scripts": {
+            "cache:clear": "symfony-cmd",
+            "assets:install %PUBLIC_DIR%": "symfony-cmd"
+        }
     }
 }
