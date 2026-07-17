@@ -47,7 +47,7 @@ src/
     Flight.php                       # public readonly properties, no getters
     Seat.php                         # public readonly, $flight eager-fetched
   Exception/
-    FlightNotFoundException.php
+    FlightNotFound.php               # no "Exception" suffix; see naming convention below
   Repository/
     FlightRepository.php             # DI service, not ServiceEntityRepository
     SeatRepository.php               # DI service, findByFlight() returns Seat[]
@@ -107,8 +107,15 @@ src/
   — not an optional combinable filter set. Missing any → 400.
 
 - **`FlightRepository::get(string $id): Flight` always returns a `Flight` or
-  throws `FlightNotFoundException`** — never `null`. No `find()` method;
+  throws `FlightNotFound`** — never `null`. No `find()` method;
   avoids null-checks at call sites.
+
+- **Exception classes don't carry an `Exception` suffix** (`FlightNotFound`,
+  not `FlightNotFoundException`). They already live in the `Exception`
+  namespace, so the suffix is redundant — this is enforced by
+  `doctrine/coding-standard`'s `SlevomatCodingStandard.Classes.SuperfluousExceptionNaming`
+  sniff (see CI section below), not just a style preference. Follow this for
+  every new exception class.
 
 - **`.env` is committed, not gitignored.** This follows Symfony convention:
   `.env` holds non-secret defaults; `.env.local`/`.env.*.local` (gitignored)
@@ -160,3 +167,66 @@ docker compose exec aeronuk-flight-search php bin/phpunit
 Tests use the `flight_search_test` database (separate from dev). The test
 DB schema is created automatically by the test bootstrap via Doctrine
 migrations.
+
+## CI
+
+`.github/workflows/ci.yml`, triggered on push to `main` and on every pull
+request. One workflow file with five jobs (not split per-concern across
+files) because `needs:` dependencies only work within a single workflow —
+splitting would have broken the `build`-once-reuse-everywhere design below.
+
+- **`build`** — builds the `frankenphp_dev` target and pushes it to GHCR
+  tagged with the commit SHA. This is an internal/ephemeral artifact for
+  job-to-job reuse, not a published release image (registry pushes are
+  intentionally out of scope for now).
+- **`composer-lint`**, **`coding-standards`**, **`static-analysis`**,
+  **`phpunit`** — each `needs: build`, pulls that image, and runs via
+  `.github/actions/bootstrap-stack` (a local composite action: log in to
+  GHCR, pull, `docker compose up -d`, poll `/health` until ready).
+
+The Dockerfile builds a **bare runtime image** — no `COPY . /app`, no
+`RUN composer install`. Application code only enters via the `.:/app` bind
+mount in `docker-compose.yml`, and `frankenphp/docker-entrypoint.sh` runs
+`composer install` (and migrations/fixtures) at container start. So the
+GHCR image alone isn't runnable — every job still needs the checked-out repo
+mounted in. `docker-compose.yml`'s `aeronuk-flight-search` service has an
+`image: ${APP_IMAGE:-aeronuk-flight-search:local}` key specifically so CI can
+point it at the pulled GHCR tag while local dev (`APP_IMAGE` unset) keeps
+building from the `Dockerfile` exactly as before.
+
+Each job (including the lint-only ones) spins up the **full** compose stack
+(app + MySQL), not a bare `docker run`, so that all four jobs reuse the
+exact same entrypoint bootstrap logic already relied on for local dev/tests,
+rather than reimplementing composer-install/migration steps per job.
+
+Tooling:
+- **`doctrine/coding-standard`** (PHP_CodeSniffer, not PHP-CS-Fixer — the
+  official Doctrine ruleset only ships for phpcs) via `phpcs.xml.dist`.
+- **PHPStan at `level: max`** via `phpstan.neon.dist`, with two extra pieces
+  wired in to make max level usable rather than full of noise:
+  - `symfony.containerXmlPath` points at the dev container XML
+    (`var/cache/dev/AeroNuk_FlightSearch_KernelDevDebugContainer.xml`),
+    generated automatically by `composer install`'s `cache:clear`
+    auto-script — this is what lets `self::getContainer()->get(X::class)`
+    resolve to `X` instead of generic `object` in tests.
+  - `doctrine.objectManagerLoader` points at `phpstan-bootstrap.php` (boots
+    the real `Kernel` and returns the `EntityManager`), which is what lets
+    PHPStan infer exact DQL result types (e.g. `FlightRepository::search()`
+    returning `Flight[]` instead of `mixed`) instead of just seeing
+    `AbstractQuery::getResult()`'s native `mixed` signature.
+  - `phpstan/phpstan-phpunit` is required so `self::assertIsString()` /
+    `assertIsArray()` / `assertInstanceOf()` narrow types for PHPStan the
+    same way `is_string()` etc. would — used deliberately in tests instead
+    of `assert()` or `@var` overrides to satisfy PHPStan's own guidance
+    against silencing errors.
+- **`composer-require-checker`** (config: `composer-require-checker.json`)
+  checks for undeclared/implicit dependencies. Its whitelist covers symbols
+  genuinely provided transitively by `symfony/framework-bundle` /
+  `doctrine/orm` that Symfony Flex itself never adds as direct requires
+  (`HttpFoundation`, `HttpKernel`, `DependencyInjection` attributes,
+  `Routing` attributes, `Doctrine\Persistence\ObjectManager`). One real gap
+  it did catch: `doctrine/doctrine-fixtures-bundle` was in `require-dev`
+  even though `src/DataFixtures/FlightFixtures.php` sits under the main
+  (non-dev) PSR-4 autoload root — it's now in `require`.
+- **`ergebnis/composer-normalize`** enforces consistent `composer.json`
+  key ordering/formatting (`composer normalize --dry-run` in CI).

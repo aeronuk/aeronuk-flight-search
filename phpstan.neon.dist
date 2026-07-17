@@ -1,0 +1,9 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - tests
+    symfony:
+        containerXmlPath: var/cache/dev/AeroNuk_FlightSearch_KernelDevDebugContainer.xml
+    doctrine:
+        objectManagerLoader: phpstan-bootstrap.php

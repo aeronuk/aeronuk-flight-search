@@ -1,0 +1,146 @@
+name: "CI"
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  build:
+    name: "Build image"
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+      packages: "write"
+    outputs:
+      image: "${{ steps.image.outputs.image }}"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Log in to GHCR"
+        uses: "docker/login-action@v4.4.0"
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "Compute image tag"
+        id: "image"
+        run: |
+          echo "image=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]'):${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+      - name: "Set up Docker Buildx"
+        uses: "docker/setup-buildx-action@v4.2.0"
+
+      - name: "Build and push"
+        uses: "docker/build-push-action@v7.3.0"
+        with:
+          context: "."
+          target: "frankenphp_dev"
+          push: true
+          tags: "${{ steps.image.outputs.image }}"
+          cache-from: "type=gha"
+          cache-to: "type=gha,mode=max"
+
+  composer-lint:
+    name: "Composer lint"
+    needs: "build"
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+      packages: "read"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Bootstrap stack"
+        uses: "./.github/actions/bootstrap-stack"
+        with:
+          image: "${{ needs.build.outputs.image }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "Validate composer.json"
+        run: "docker compose exec -T aeronuk-flight-search composer validate --strict"
+
+      - name: "Check composer.json is normalized"
+        run: "docker compose exec -T aeronuk-flight-search composer normalize --dry-run"
+
+      - name: "Check for undeclared dependencies"
+        run: "docker compose exec -T aeronuk-flight-search vendor/bin/composer-require-checker check --config-file=composer-require-checker.json"
+
+      - name: "Stop stack"
+        if: always()
+        run: "docker compose down -v"
+
+  coding-standards:
+    name: "Coding standards"
+    needs: "build"
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+      packages: "read"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Bootstrap stack"
+        uses: "./.github/actions/bootstrap-stack"
+        with:
+          image: "${{ needs.build.outputs.image }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "phpcs (Doctrine coding standard)"
+        run: "docker compose exec -T aeronuk-flight-search vendor/bin/phpcs"
+
+      - name: "Stop stack"
+        if: always()
+        run: "docker compose down -v"
+
+  static-analysis:
+    name: "Static analysis"
+    needs: "build"
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+      packages: "read"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Bootstrap stack"
+        uses: "./.github/actions/bootstrap-stack"
+        with:
+          image: "${{ needs.build.outputs.image }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "phpstan (max level)"
+        run: "docker compose exec -T aeronuk-flight-search vendor/bin/phpstan analyse --memory-limit=1G"
+
+      - name: "Stop stack"
+        if: always()
+        run: "docker compose down -v"
+
+  phpunit:
+    name: "PHPUnit tests"
+    needs: "build"
+    runs-on: "ubuntu-latest"
+    permissions:
+      contents: "read"
+      packages: "read"
+    steps:
+      - name: "Checkout"
+        uses: "actions/checkout@v7.0.0"
+
+      - name: "Bootstrap stack"
+        uses: "./.github/actions/bootstrap-stack"
+        with:
+          image: "${{ needs.build.outputs.image }}"
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: "PHPUnit"
+        run: "docker compose exec -T aeronuk-flight-search php bin/phpunit"
+
+      - name: "Stop stack"
+        if: always()
+        run: "docker compose down -v"

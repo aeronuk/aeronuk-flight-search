@@ -1,8 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\Exception;
 
-final class FlightNotFoundException extends \RuntimeException
+use RuntimeException;
+
+use function sprintf;
+
+final class FlightNotFound extends RuntimeException
 {
     public function __construct(string $id)
     {

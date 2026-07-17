@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\Repository;
 
 use AeroNuk\FlightSearch\Entity\Flight;
@@ -12,9 +14,7 @@ class SeatRepository
     {
     }
 
-    /**
-     * @return Seat[]
-     */
+    /** @return Seat[] */
     public function findByFlight(Flight $flight): array
     {
         return $this->em->createQueryBuilder()

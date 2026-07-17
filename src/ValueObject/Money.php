@@ -1,8 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\ValueObject;
 
 use Doctrine\ORM\Mapping as ORM;
+use InvalidArgumentException;
+
+use function preg_match;
+use function sprintf;
 
 #[ORM\Embeddable]
 final class Money
@@ -13,12 +19,16 @@ final class Money
         #[ORM\Column(name: 'currency', type: 'string', length: 3)]
         public readonly string $currency,
     ) {
-        if (!preg_match('/^\d+\.\d{2}$/', $amount)) {
-            throw new \InvalidArgumentException(sprintf('Invalid money amount "%s", expected format like "299.99".', $amount));
+        if (! preg_match('/^\d+\.\d{2}$/', $amount)) {
+            throw new InvalidArgumentException(
+                sprintf('Invalid money amount "%s", expected format like "299.99".', $amount),
+            );
         }
 
-        if (!preg_match('/^[A-Z]{3}$/', $currency)) {
-            throw new \InvalidArgumentException(sprintf('Invalid currency code "%s", expected a 3-letter ISO code.', $currency));
+        if (! preg_match('/^[A-Z]{3}$/', $currency)) {
+            throw new InvalidArgumentException(
+                sprintf('Invalid currency code "%s", expected a 3-letter ISO code.', $currency),
+            );
         }
     }
 }

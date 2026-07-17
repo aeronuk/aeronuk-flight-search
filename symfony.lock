@@ -47,6 +47,9 @@
             "migrations/.gitignore"
         ]
     },
+    "phpstan/phpstan": {
+        "version": "2.2.5"
+    },
     "phpunit/phpunit": {
         "version": "13.2",
         "recipe": {
@@ -61,6 +64,9 @@
             "tests/bootstrap.php",
             "bin/phpunit"
         ]
+    },
+    "squizlabs/php_codesniffer": {
+        "version": "4.0.1"
     },
     "symfony/console": {
         "version": "8.1",

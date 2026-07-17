@@ -1,0 +1,45 @@
+name: "Bootstrap docker compose stack"
+description: "Logs into GHCR, pulls the pre-built app image, starts the docker compose stack, and waits until the app is healthy."
+
+inputs:
+  image:
+    description: "Fully-qualified image reference to use for the aeronuk-flight-search service"
+    required: true
+  github-token:
+    description: "Token used to authenticate to GHCR"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: "Log in to GHCR"
+      uses: "docker/login-action@v4.4.0"
+      with:
+        registry: "ghcr.io"
+        username: "${{ github.actor }}"
+        password: "${{ inputs.github-token }}"
+
+    - name: "Pull image"
+      shell: "bash"
+      env:
+        APP_IMAGE: "${{ inputs.image }}"
+      run: "docker pull \"$APP_IMAGE\""
+
+    - name: "Start stack"
+      shell: "bash"
+      env:
+        APP_IMAGE: "${{ inputs.image }}"
+      run: "docker compose up -d"
+
+    - name: "Wait for app to be healthy"
+      shell: "bash"
+      run: |
+        for i in $(seq 1 60); do
+          if curl -sf http://localhost:8000/health > /dev/null; then
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "App did not become healthy in time" >&2
+        docker compose logs
+        exit 1

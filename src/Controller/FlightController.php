@@ -1,15 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\Controller;
 
-use AeroNuk\FlightSearch\Exception\FlightNotFoundException;
+use AeroNuk\FlightSearch\Exception\FlightNotFound;
 use AeroNuk\FlightSearch\Repository\FlightRepository;
 use AeroNuk\FlightSearch\Repository\SeatRepository;
 use AeroNuk\FlightSearch\ValueObject\AirportCode;
+use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
+
+use function strtoupper;
 
 class FlightController
 {
@@ -27,6 +32,7 @@ class FlightController
         if ($originParam === null) {
             return new JsonResponse(['error' => 'origin is required'], 400);
         }
+
         $origin = AirportCode::tryFrom(strtoupper($originParam));
         if ($origin === null) {
             return new JsonResponse(['error' => 'origin must be a known 3-letter airport code'], 400);
@@ -36,6 +42,7 @@ class FlightController
         if ($destinationParam === null) {
             return new JsonResponse(['error' => 'destination is required'], 400);
         }
+
         $destination = AirportCode::tryFrom(strtoupper($destinationParam));
         if ($destination === null) {
             return new JsonResponse(['error' => 'destination must be a known 3-letter airport code'], 400);
@@ -45,7 +52,8 @@ class FlightController
         if ($dateParam === null) {
             return new JsonResponse(['error' => 'date is required'], 400);
         }
-        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $dateParam);
+
+        $date = DateTimeImmutable::createFromFormat('Y-m-d', $dateParam);
         if ($date === false) {
             return new JsonResponse(['error' => 'date must be in YYYY-MM-DD format'], 400);
         }
@@ -60,7 +68,7 @@ class FlightController
     {
         try {
             $flight = $this->flightRepository->get($id);
-        } catch (FlightNotFoundException) {
+        } catch (FlightNotFound) {
             return new JsonResponse(['error' => 'flight not found'], 404);
         }
 

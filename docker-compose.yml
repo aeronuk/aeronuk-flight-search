@@ -1,6 +1,7 @@
 services:
 
   aeronuk-flight-search:
+    image: ${APP_IMAGE:-aeronuk-flight-search:local}
     build:
       context: .
       target: frankenphp_dev

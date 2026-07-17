@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace AeroNuk\FlightSearch\Controller;
 
 use Symfony\Component\HttpFoundation\JsonResponse;
