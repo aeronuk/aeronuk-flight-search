@@ -36,8 +36,6 @@ Unknown flight ID → `404`.
 
 ```
 src/
-  Command/
-    LoadFixturesIfEmptyCommand.php   # runs fixtures only when flight table is empty
   Controller/
     FlightController.php             # GET /api/flights, GET /api/flights/{id}/seats
     HealthController.php             # GET /health
@@ -129,13 +127,15 @@ src/
   `ORDER BY seatNumber ASC` — without zero-padding, `'12A'` sorts before
   `'1A'`. Keep the zero-padding; don't change the repository sort.
 
-- **Fixtures auto-load only in `dev`/`test`, only when the `flight` table is
-  empty.** `LoadFixturesIfEmptyCommand` wired into `frankenphp/docker-entrypoint.sh`.
-  The nested `doctrine:fixtures:load` command inside it needs
-  `$fixturesInput->setInteractive(false)` called explicitly — passing
-  `['--no-interaction' => true]` into the `ArrayInput` constructor is NOT
-  enough, because `Application::doRun()` only parses that flag from raw argv,
-  not from a programmatic `ArrayInput`.
+- **Fixtures reload unconditionally in `dev`/`test` on every container
+  start** — `frankenphp/docker-entrypoint.sh` runs
+  `doctrine:fixtures:load --no-interaction` directly (Doctrine's own
+  command, gated on `$APP_ENV` in the shell script) after migrations, every
+  time. Deliberately not conditioned on "table is empty" — that was a
+  previous design (`LoadFixturesIfEmptyCommand`) and was removed as an
+  unnecessary layer of conditional logic. Fixture data isn't precious;
+  resetting it on every restart is simpler and more predictable than trying
+  to preserve it.
 
 - **MySQL test database setup.** The official `mysql` Docker image only grants
   the `aeronuk` user access to the one database named in `MYSQL_DATABASE`
