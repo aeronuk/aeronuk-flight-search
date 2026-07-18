@@ -12,6 +12,7 @@ use AeroNuk\FlightSearch\ValueObject\AirportCode;
 use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
@@ -30,7 +31,8 @@ class SeatRepositoryTest extends KernelTestCase
         $this->resetDatabase($this->em);
     }
 
-    public function testFindByFlightReturnsOnlyThatFlightsSeatsAndEagerLoadsTheFlight(): void
+    #[Test]
+    public function findByFlightReturnsOnlyThatFlightsSeatsAndEagerLoadsTheFlight(): void
     {
         $flightA = new Flight(
             (string) Uuid::v7(),

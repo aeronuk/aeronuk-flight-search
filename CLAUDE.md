@@ -205,10 +205,20 @@ method with a [`#[DataProvider('...')]`](https://docs.phpunit.de/en/12.5/writing
 attribute (from `PHPUnit\Framework\Attributes\DataProvider`) backed by a
 `public static function ...Provider(): iterable` that yields
 `'case description' => [...args]`. See
-`FlightControllerTest::testSearchWithInvalidQueryReturns400()` /
+`FlightControllerTest::searchWithInvalidQueryReturns400()` /
 `invalidSearchQueryProvider()` for the pattern. Don't add another
-`testSearchWith*Returns400()`-style method for a new invalid-input case —
+`searchWith*Returns400()`-style method for a new invalid-input case —
 add a case to the existing provider instead.
+
+**Test methods are marked with `#[PHPUnit\Framework\Attributes\Test]`, not
+named with the legacy `test`-prefix convention.** Name the method for the
+behavior it verifies (`searchReturnsMatchingFlights`, not
+`testSearchReturnsMatchingFlights`), and add `use
+PHPUnit\Framework\Attributes\Test;` plus `#[Test]` above it — stacked above
+`#[DataProvider(...)]` where both apply, as in
+`FlightControllerTest::searchWithInvalidQueryReturns400()`. This makes test
+discovery explicit via the attribute rather than implicit via method
+naming.
 
 ## CI
 
