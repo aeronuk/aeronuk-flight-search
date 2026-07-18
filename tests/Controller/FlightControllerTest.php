@@ -122,6 +122,42 @@ class FlightControllerTest extends WebTestCase
         self::assertArrayHasKey('error', $data);
     }
 
+    public function testSearchWithUnknownDestinationAirportCodeReturns400(): void
+    {
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=ZZZ&date=2026-07-01');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = $this->decodeJsonResponse($this->client);
+        self::assertArrayHasKey('error', $data);
+    }
+
+    public function testSearchWithBlankOriginReturns400(): void
+    {
+        $this->client->request('GET', '/api/flights?origin=&destination=LAX&date=2026-07-01');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = $this->decodeJsonResponse($this->client);
+        self::assertArrayHasKey('error', $data);
+    }
+
+    public function testSearchWithBlankDestinationReturns400(): void
+    {
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=&date=2026-07-01');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = $this->decodeJsonResponse($this->client);
+        self::assertArrayHasKey('error', $data);
+    }
+
+    public function testSearchWithBlankDateReturns400(): void
+    {
+        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=');
+
+        self::assertResponseStatusCodeSame(400);
+        $data = $this->decodeJsonResponse($this->client);
+        self::assertArrayHasKey('error', $data);
+    }
+
     public function testSeatsHappyPath(): void
     {
         $flight = $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
