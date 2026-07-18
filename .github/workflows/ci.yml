@@ -137,8 +137,25 @@ jobs:
           image: "${{ needs.build.outputs.image }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
 
-      - name: "PHPUnit"
-        run: "make test"
+      - name: "PHPUnit with coverage"
+        run: "make coverage"
+
+      - name: "Copy coverage reports out of the container"
+        # docker-compose.yml mounts an anonymous volume over /app/var
+        # (`- /app/var`) so container-only state like this doesn't land in
+        # the bind-mounted checkout — the Clover files `make coverage`
+        # writes under /app/var/coverage never appear on the runner's
+        # filesystem on their own. codecov-action runs on the runner, not
+        # in the container, so the reports have to be copied out first.
+        run: |
+          mkdir -p var/coverage
+          docker compose cp aeronuk-flight-search:/app/var/coverage/. ./var/coverage/
+
+      - name: "Upload coverage to Codecov"
+        uses: "codecov/codecov-action@v7.0.0"
+        with:
+          token: "${{ secrets.CODECOV_TOKEN }}"
+          files: "var/coverage/unit.clover.xml,var/coverage/functional.clover.xml"
 
       - name: "Stop stack"
         if: always()
