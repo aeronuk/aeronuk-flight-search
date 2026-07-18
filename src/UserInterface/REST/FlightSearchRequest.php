@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Request;
+namespace AeroNuk\FlightSearch\UserInterface\REST;
 
-use AeroNuk\FlightSearch\ValueObject\AirportCode;
+use AeroNuk\FlightSearch\Domain\AirportCode;
 use Symfony\Component\Validator\Constraints as Assert;
 
 use function array_column;

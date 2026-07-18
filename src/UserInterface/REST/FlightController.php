@@ -2,13 +2,12 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Controller;
+namespace AeroNuk\FlightSearch\UserInterface\REST;
 
-use AeroNuk\FlightSearch\Exception\FlightNotFound;
-use AeroNuk\FlightSearch\Repository\FlightRepository;
-use AeroNuk\FlightSearch\Repository\SeatRepository;
-use AeroNuk\FlightSearch\Request\FlightSearchRequest;
-use AeroNuk\FlightSearch\ValueObject\AirportCode;
+use AeroNuk\FlightSearch\Domain\AirportCode;
+use AeroNuk\FlightSearch\Domain\FlightNotFound;
+use AeroNuk\FlightSearch\Domain\FlightRepository;
+use AeroNuk\FlightSearch\Domain\SeatRepository;
 use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpKernel\Attribute\MapQueryString;

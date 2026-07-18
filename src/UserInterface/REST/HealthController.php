@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Controller;
+namespace AeroNuk\FlightSearch\UserInterface\REST;
 
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;

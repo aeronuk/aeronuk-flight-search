@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\EventListener;
+namespace AeroNuk\FlightSearch\UserInterface\REST;
 
 use Symfony\Component\EventDispatcher\Attribute\AsEventListener;
 use Symfony\Component\HttpFoundation\JsonResponse;
