@@ -12,6 +12,7 @@ use AeroNuk\FlightSearch\ValueObject\AirportCode;
 use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Uid\Uuid;
@@ -77,85 +78,28 @@ class FlightControllerTest extends WebTestCase
         self::assertSame(['amount' => '199.99', 'currency' => 'USD'], $data[0]['price']);
     }
 
-    public function testSearchRequiresOrigin(): void
+    #[DataProvider('invalidSearchQueryProvider')]
+    public function testSearchWithInvalidQueryReturns400(string $queryString): void
     {
-        $this->client->request('GET', '/api/flights?destination=LAX&date=2026-07-01');
+        $this->client->request('GET', '/api/flights?' . $queryString);
 
         self::assertResponseStatusCodeSame(400);
         $data = $this->decodeJsonResponse($this->client);
         self::assertArrayHasKey('error', $data);
     }
 
-    public function testSearchRequiresDestination(): void
+    /** @return iterable<string, array{string}> */
+    public static function invalidSearchQueryProvider(): iterable
     {
-        $this->client->request('GET', '/api/flights?origin=JFK&date=2026-07-01');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchRequiresDate(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchWithInvalidDateReturns400(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=not-a-date');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchWithUnknownAirportCodeReturns400(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=ZZZ&destination=LAX&date=2026-07-01');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchWithUnknownDestinationAirportCodeReturns400(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=JFK&destination=ZZZ&date=2026-07-01');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchWithBlankOriginReturns400(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=&destination=LAX&date=2026-07-01');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchWithBlankDestinationReturns400(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=JFK&destination=&date=2026-07-01');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
-    }
-
-    public function testSearchWithBlankDateReturns400(): void
-    {
-        $this->client->request('GET', '/api/flights?origin=JFK&destination=LAX&date=');
-
-        self::assertResponseStatusCodeSame(400);
-        $data = $this->decodeJsonResponse($this->client);
-        self::assertArrayHasKey('error', $data);
+        yield 'missing origin' => ['destination=LAX&date=2026-07-01'];
+        yield 'missing destination' => ['origin=JFK&date=2026-07-01'];
+        yield 'missing date' => ['origin=JFK&destination=LAX'];
+        yield 'blank origin' => ['origin=&destination=LAX&date=2026-07-01'];
+        yield 'blank destination' => ['origin=JFK&destination=&date=2026-07-01'];
+        yield 'blank date' => ['origin=JFK&destination=LAX&date='];
+        yield 'invalid date format' => ['origin=JFK&destination=LAX&date=not-a-date'];
+        yield 'unknown origin airport code' => ['origin=ZZZ&destination=LAX&date=2026-07-01'];
+        yield 'unknown destination airport code' => ['origin=JFK&destination=ZZZ&date=2026-07-01'];
     }
 
     public function testSeatsHappyPath(): void
