@@ -44,11 +44,15 @@ src/
   Entity/
     Flight.php                       # public readonly properties, no getters
     Seat.php                         # public readonly, $flight eager-fetched
+  EventListener/
+    ValidationExceptionListener.php  # converts #[MapQueryString] validation failures to {"error": ...}
   Exception/
     FlightNotFound.php               # no "Exception" suffix; see naming convention below
   Repository/
     FlightRepository.php             # DI service, not ServiceEntityRepository
     SeatRepository.php               # DI service, findByFlight() returns Seat[]
+  Request/
+    FlightSearchRequest.php          # #[MapQueryString] DTO for GET /api/flights, Symfony Validator constraints
   ValueObject/
     AirportCode.php                  # closed enum: LHR JFK LAX ORD SFO NRT
     Money.php                        # Doctrine embeddable: amount + currency
@@ -103,6 +107,23 @@ src/
 
 - **`GET /api/flights` requires all three params** (origin, destination, date)
   — not an optional combinable filter set. Missing any → 400.
+
+- **`GET /api/flights` validates via Symfony Validator on a request DTO, not
+  hand-written `if`/`return` branches.** `FlightController::search()` takes
+  `#[MapQueryString(validationFailedStatusCode: 400)] FlightSearchRequest
+  $request` — Symfony denormalizes the query string into
+  `Request\FlightSearchRequest` and runs its `Assert\NotBlank` /
+  `Assert\Choice` / `Assert\Date` constraints before the controller body
+  runs at all. `FlightSearchRequest`'s `origin`/`destination`/`date`
+  properties are plain `string|null` (constraints, not PHP types, enforce
+  "required"); the controller converts them to `AirportCode` and
+  `DateTimeImmutable` after validation passes. On validation failure,
+  Symfony throws an `HttpException` wrapping a `ValidationFailedException`
+  — `EventListener\ValidationExceptionListener` catches that specific case
+  (previous instance check, not a blanket exception handler) and rewrites
+  it to this API's `{"error": "..."}` JSON shape instead of Symfony's
+  default (HTML in debug mode, `title`/`detail` JSON in prod), so the `400`
+  response contract stays exactly what it was under manual validation.
 
 - **`FlightRepository::get(string $id): Flight` always returns a `Flight` or
   throws `FlightNotFound`** — never `null`. No `find()` method;
