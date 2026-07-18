@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\Repository;
+namespace AeroNuk\FlightSearch\Tests\Domain;
 
-use AeroNuk\FlightSearch\Entity\Flight;
-use AeroNuk\FlightSearch\Repository\FlightRepository;
+use AeroNuk\FlightSearch\Domain\AirportCode;
+use AeroNuk\FlightSearch\Domain\Flight;
+use AeroNuk\FlightSearch\Domain\FlightRepository;
+use AeroNuk\FlightSearch\Domain\Money;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
-use AeroNuk\FlightSearch\ValueObject\AirportCode;
-use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\Test;

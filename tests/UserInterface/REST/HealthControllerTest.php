@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\Controller;
+namespace AeroNuk\FlightSearch\Tests\UserInterface\REST;
 
 use AeroNuk\FlightSearch\Tests\DecodesJsonResponse;
 use PHPUnit\Framework\Attributes\Test;
