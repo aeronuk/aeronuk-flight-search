@@ -215,37 +215,77 @@ add a case to the existing provider instead.
 `.github/workflows/ci.yml`, triggered on push to `main` and on every pull
 request. One workflow file with five jobs (not split per-concern across
 files) because `needs:` dependencies only work within a single workflow —
-splitting would have broken the `build`-once-reuse-everywhere design below.
+`phpunit`'s `needs: build` (see below) would break across separate files.
 
 - **`build`** — builds the `frankenphp_dev` target and pushes it to GHCR
   tagged with the commit SHA. This is an internal/ephemeral artifact for
   job-to-job reuse, not a published release image (registry pushes are
   intentionally out of scope for now).
-- **`composer-lint`**, **`coding-standards`**, **`static-analysis`**,
-  **`phpunit`** — each `needs: build`, pulls that image, and runs via
+- **`phpunit`** — `needs: build`, pulls that image, and runs via
   `.github/actions/bootstrap-stack` (a local composite action: log in to
-  GHCR, pull, `docker compose up -d`, poll `/health` until ready).
+  GHCR, pull, `docker compose up -d`, poll `/health` until ready). It's the
+  only job that talks to a real database (the test schema), so it's the
+  only one that pays for the image build + full compose stack.
+- **`composer-lint`**, **`coding-standards`**, **`static-analysis`** — run
+  on bare PHP instead: `actions/checkout` → `shivammathur/setup-php`
+  (installs PHP 8.4 directly on the runner, no Docker/image involved) →
+  `ramsey/composer-install` → `make <target>`. None of the three touches a
+  database (they lint `composer.json`, run `phpcs`, and run `phpstan`
+  respectively), so they don't declare `needs: build` and start immediately
+  in parallel with it instead of waiting on it — the critical path of a CI
+  run is roughly `max(build+phpunit, slowest bare-PHP job)` rather than
+  `build` gating everything. Each job installs only the PHP extensions its
+  tool actually needs, cross-checked against the Dockerfile's
+  `install-php-extensions` list (`apcu`, `bcmath`, `intl`, `opcache`,
+  `pdo_mysql`, `zip`) by actually running each job's checks with that exact
+  extension set on a bare (non-Docker) PHP install, rather than assuming:
+  - `composer-lint` installs `bcmath` and `intl` — `composer-require-checker`
+    (config: `composer-require-checker.json`) pulls in
+    `php-standard-library` transitively, which genuinely requires both at
+    runtime.
+  - `coding-standards` and `static-analysis` need neither. But `composer
+    install` platform-checks the *entire* locked `composer.json` (including
+    `require-dev`) on every run, regardless of which job invokes it or what
+    it's actually going to use — so without `bcmath`/`intl` present, plain
+    `composer install` fails outright for these two jobs even though phpcs
+    and phpstan themselves never touch either extension. Their `composer
+    install` step passes `--ignore-platform-req=ext-bcmath
+    --ignore-platform-req=ext-intl` to work around that.
+  - None of the three needs `pdo_mysql`, `apcu`, `opcache`, or `zip`.
+    Notably, `static-analysis`'s `phpstan-bootstrap.php` boots the real
+    Symfony `Kernel` and resolves the Doctrine `EntityManager` — but
+    Doctrine's `Connection` is lazy and never actually connects just to
+    resolve entity metadata, so `phpstan analyse` passes on a runner with no
+    `pdo_mysql` extension at all and no reachable `flight-search-db` host
+    (verified directly, not assumed: same command, same `DATABASE_URL` from
+    `.env`, against a container with only `ctype`/`iconv` installed).
 
 The Dockerfile builds a **bare runtime image** — no `COPY . /app`, no
 `RUN composer install`. Application code only enters via the `.:/app` bind
 mount in `docker-compose.yml`, and `frankenphp/docker-entrypoint.sh` runs
 `composer install` (and migrations/fixtures) at container start. So the
-GHCR image alone isn't runnable — every job still needs the checked-out repo
+GHCR image alone isn't runnable — `phpunit` still needs the checked-out repo
 mounted in. `docker-compose.yml`'s `aeronuk-flight-search` service has an
 `image: ${APP_IMAGE:-aeronuk-flight-search:local}` key specifically so CI can
 point it at the pulled GHCR tag while local dev (`APP_IMAGE` unset) keeps
 building from the `Dockerfile` exactly as before.
 
-Each job (including the lint-only ones) spins up the **full** compose stack
-(app + MySQL), not a bare `docker run`, so that all four jobs reuse the
-exact same entrypoint bootstrap logic already relied on for local dev/tests,
-rather than reimplementing composer-install/migration steps per job.
+`phpunit` spins up the **full** compose stack (app + MySQL), not a bare
+`docker run`, so it reuses the exact same entrypoint bootstrap logic already
+relied on for local dev/tests, rather than reimplementing
+composer-install/migration steps.
 
 The actual tool invocations live in the root `Makefile` (`make cs`, `make
-stan`, `make composer-lint`, `make test`), not inline in `ci.yml` — the
-workflow just calls `make <target>` after bootstrapping the stack. This
+stan`, `make composer-lint`, `make test`), not inline in `ci.yml`. This
 keeps the exact same command available for local use (`make test` is the
 documented way to run tests — see below) and in CI, so the two never drift.
+`cs`, `stan`, and `composer-lint` run their tool through a `DOCKER_EXEC`
+Makefile variable that defaults to `docker compose exec -T
+aeronuk-flight-search` (local dev, and matching prior CI behavior); the
+three bare-PHP CI jobs override it to empty (`make stan DOCKER_EXEC=`) so
+the same target runs the tool directly against the runner's own PHP instead.
+`test` doesn't take this variable — it's Docker/compose-only, since
+`phpunit` is the one job that needs the live database.
 
 Tooling:
 - **`doctrine/coding-standard`** (PHP_CodeSniffer, not PHP-CS-Fixer — the
