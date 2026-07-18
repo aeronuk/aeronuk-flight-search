@@ -34,28 +34,34 @@ Unknown flight ID → `404`.
 
 ## Source layout
 
+`src/` is organized by architectural layer, not by Symfony class type:
+`Domain` (entities, repositories, value objects, domain exceptions),
+`UserInterface/REST` (everything serving the HTTP API), and `Infra`
+(Doctrine tooling — migrations, fixtures). `Kernel.php` is the one
+exception, staying unmoved at the `src/` root since it's Symfony's
+framework bootstrap class, not part of the three-layer split.
+
 ```
 src/
-  Controller/
-    FlightController.php             # GET /api/flights, GET /api/flights/{id}/seats
-    HealthController.php             # GET /health
-  DataFixtures/
-    FlightFixtures.php               # seed data; only loads in dev/test
-  Entity/
-    Flight.php                       # public readonly properties, no getters
-    Seat.php                         # public readonly, $flight eager-fetched
-  EventListener/
-    ValidationExceptionListener.php  # converts #[MapQueryString] validation failures to {"error": ...}
-  Exception/
-    FlightNotFound.php               # no "Exception" suffix; see naming convention below
-  Repository/
-    FlightRepository.php             # DI service, not ServiceEntityRepository
-    SeatRepository.php               # DI service, findByFlight() returns Seat[]
-  Request/
-    FlightSearchRequest.php          # #[MapQueryString] DTO for GET /api/flights, Symfony Validator constraints
-  ValueObject/
-    AirportCode.php                  # closed enum: LHR JFK LAX ORD SFO NRT
-    Money.php                        # Doctrine embeddable: amount + currency
+  Domain/                             # flat — no Entity/Repository/ValueObject/Exception subfolders
+    Flight.php                        # public readonly properties, no getters
+    Seat.php                          # public readonly, $flight eager-fetched
+    FlightRepository.php              # DI service, not ServiceEntityRepository
+    SeatRepository.php                # DI service, findByFlight() returns Seat[]
+    AirportCode.php                   # closed enum: LHR JFK LAX ORD SFO NRT
+    Money.php                         # Doctrine embeddable: amount + currency
+    FlightNotFound.php                # no "Exception" suffix; see naming convention below
+  UserInterface/
+    REST/
+      FlightController.php            # GET /api/flights, GET /api/flights/{id}/seats
+      HealthController.php            # GET /health
+      FlightSearchRequest.php         # #[MapQueryString] DTO for GET /api/flights, Symfony Validator constraints
+      ValidationExceptionListener.php # converts #[MapQueryString] validation failures to {"error": ...}
+  Infra/
+    DataFixtures/
+      FlightFixtures.php              # seed data; only loads in dev/test
+    Migrations/
+      Version*.php                    # was the top-level migrations/ directory
   Kernel.php
 ```
 
@@ -64,6 +70,25 @@ src/
 - **Root namespace `AeroNuk\FlightSearch`** — reconfigured in `composer.json`,
   `config/services.yaml`, `src/Kernel.php`, `public/index.php`, `bin/console`.
   Every new class goes under this namespace.
+
+- **`src/` is organized by architectural layer (`Domain` /
+  `UserInterface/REST` / `Infra`), not by Symfony class type.** See "Source
+  layout" above. `Domain` classes (entities, repositories, value objects,
+  the domain exception) sit **flat** directly under `src/Domain/` — no
+  `Entity`/`Repository`/`ValueObject`/`Exception` subfolders — all sharing
+  one `AeroNuk\FlightSearch\Domain` namespace; `tests/Domain/` mirrors that
+  flatness. `config/packages/doctrine_migrations.yaml`'s `migrations_paths`
+  points at `src/Infra/Migrations` (previously the top-level `migrations/`
+  directory); `frankenphp/docker-entrypoint.sh`'s migrations-present check
+  was updated to match. Auto-generated migrations are deliberately excluded
+  from `phpstan.neon.dist`/`phpcs.xml.dist` — they were never linted or
+  analyzed when they lived outside `src/`, and moving them in-tree isn't
+  meant to newly subject generated code to `level: max` / the Doctrine
+  ruleset. `config/services.yaml`'s `when@test` block can no longer make
+  "just the repositories" public via a directory resource (there's no
+  `Repository/` subfolder left to scope to) — it declares
+  `AeroNuk\FlightSearch\Domain\FlightRepository`/`SeatRepository` public
+  explicitly instead, one service at a time.
 
 - **Hand-rolled controllers + Doctrine ORM, not API Platform.** The two
   endpoints are simple explicit searches, not generic resource CRUD.
@@ -95,8 +120,8 @@ src/
     Without it Doctrine prefixes columns as `price_amount`/`price_currency`
     but the migration uses flat `price`/`currency` — mismatch → broken schema.
   - The Doctrine mapping `dir` in `config/packages/doctrine.yaml` must be
-    `%kernel.project_dir%/src` (the whole `src/` tree), not just `src/Entity`,
-    so `Money` in `src/ValueObject/` is discovered as a mapped embeddable.
+    `%kernel.project_dir%/src` (the whole `src/` tree), not just `src/Domain`,
+    so `Money` in `src/Domain/` is discovered as a mapped embeddable.
 
 - **`Flight`'s constructor rejects `departureTime >= arrivalTime`.**
 
@@ -112,14 +137,14 @@ src/
   hand-written `if`/`return` branches.** `FlightController::search()` takes
   `#[MapQueryString(validationFailedStatusCode: 400)] FlightSearchRequest
   $request` — Symfony denormalizes the query string into
-  `Request\FlightSearchRequest` and runs its `Assert\NotBlank` /
+  `UserInterface\REST\FlightSearchRequest` and runs its `Assert\NotBlank` /
   `Assert\Choice` / `Assert\Date` constraints before the controller body
   runs at all. `FlightSearchRequest`'s `origin`/`destination`/`date`
   properties are plain `string|null` (constraints, not PHP types, enforce
   "required"); the controller converts them to `AirportCode` and
   `DateTimeImmutable` after validation passes. On validation failure,
   Symfony throws an `HttpException` wrapping a `ValidationFailedException`
-  — `EventListener\ValidationExceptionListener` catches that specific case
+  — `UserInterface\REST\ValidationExceptionListener` catches that specific case
   (previous instance check, not a blanket exception handler) and rewrites
   it to this API's `{"error": "..."}` JSON shape instead of Symfony's
   default (HTML in debug mode, `title`/`detail` JSON in prod), so the `400`
@@ -324,7 +349,7 @@ Tooling:
   (`HttpFoundation`, `HttpKernel`, `DependencyInjection` attributes,
   `Routing` attributes, `Doctrine\Persistence\ObjectManager`). One real gap
   it did catch: `doctrine/doctrine-fixtures-bundle` was in `require-dev`
-  even though `src/DataFixtures/FlightFixtures.php` sits under the main
-  (non-dev) PSR-4 autoload root — it's now in `require`.
+  even though `src/Infra/DataFixtures/FlightFixtures.php` sits under the
+  main (non-dev) PSR-4 autoload root — it's now in `require`.
 - **`ergebnis/composer-normalize`** enforces consistent `composer.json`
   key ordering/formatting (`composer normalize --dry-run` in CI).
