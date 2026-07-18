@@ -197,6 +197,19 @@ the pattern from a sibling project. Running `php bin/phpunit` directly
 volume — this bit us once already; don't reach for `docker compose exec ...
 php bin/phpunit` as a shortcut.
 
+**Use PHPUnit data providers instead of copy-pasted near-identical test
+methods.** When several test cases exercise the same code path and differ
+only in input/expected values (e.g. several different invalid
+`GET /api/flights` query strings that should each 400), write one test
+method with a [`#[DataProvider('...')]`](https://docs.phpunit.de/en/12.5/writing-tests-for-phpunit.html#data-providers)
+attribute (from `PHPUnit\Framework\Attributes\DataProvider`) backed by a
+`public static function ...Provider(): iterable` that yields
+`'case description' => [...args]`. See
+`FlightControllerTest::testSearchWithInvalidQueryReturns400()` /
+`invalidSearchQueryProvider()` for the pattern. Don't add another
+`testSearchWith*Returns400()`-style method for a new invalid-input case —
+add a case to the existing provider instead.
+
 ## CI
 
 `.github/workflows/ci.yml`, triggered on push to `main` and on every pull
