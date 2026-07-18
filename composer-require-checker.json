@@ -2,9 +2,14 @@
     "symbol-whitelist": [
         "Doctrine\\Persistence\\ObjectManager",
         "Symfony\\Component\\DependencyInjection\\Attribute\\Autowire",
+        "Symfony\\Component\\EventDispatcher\\Attribute\\AsEventListener",
         "Symfony\\Component\\HttpFoundation\\JsonResponse",
         "Symfony\\Component\\HttpFoundation\\Request",
+        "Symfony\\Component\\HttpKernel\\Attribute\\MapQueryString",
+        "Symfony\\Component\\HttpKernel\\Event\\ExceptionEvent",
+        "Symfony\\Component\\HttpKernel\\Exception\\HttpExceptionInterface",
         "Symfony\\Component\\HttpKernel\\Kernel",
+        "Symfony\\Component\\HttpKernel\\KernelEvents",
         "Symfony\\Component\\Routing\\Attribute\\Route"
     ]
 }
