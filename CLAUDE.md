@@ -222,6 +222,43 @@ the pattern from a sibling project. Running `php bin/phpunit` directly
 volume — this bit us once already; don't reach for `docker compose exec ...
 php bin/phpunit` as a shortcut.
 
+**Test namespaces mirror the namespace of the class under test — there is
+no separate `Tests\` prefix.** `composer.json`'s `autoload-dev` maps the
+same `AeroNuk\FlightSearch\` PSR-4 prefix that `autoload` uses for `src/`
+to `tests/` as well (Composer supports multiple base directories per
+prefix, merged only for dev installs — production `--no-dev` autoloading
+never sees `tests/`). Concretely: `AeroNuk\FlightSearch\Domain\FlightRepository`
+is tested by `AeroNuk\FlightSearch\Domain\FlightRepositoryTest` in
+`tests/Domain/FlightRepositoryTest.php`, `AeroNuk\FlightSearch\UserInterface\REST\FlightController`
+by `AeroNuk\FlightSearch\UserInterface\REST\FlightControllerTest` in
+`tests/UserInterface/REST/FlightControllerTest.php`, and so on — a test
+class's namespace is *identical* to the production class it tests,
+distinguished only by living under `tests/` instead of `src/`.
+`tests/Tests/DecodesJsonResponse.php` and `tests/Tests/ResetsDatabase.php`
+are the deliberate exception: shared test helper traits with no single
+production class to mirror, so they keep the existing shared
+`AeroNuk\FlightSearch\Tests` namespace — and, because that namespace has
+one more segment than the mirrored classes do, they live one directory
+deeper too (`tests/Tests/`, not `tests/`), so the PSR-4 base-directory
+mapping above still resolves them correctly.
+
+**Tests are Unit by default; anything that touches the database, makes an
+HTTP request, or boots the Kernel/container is tagged
+`#[PHPUnit\Framework\Attributes\Group('functional')]`** on the class (or
+method, for a mixed class). The namespace-mirroring rule above rules out a
+folder-based `tests/Unit` vs `tests/Functional` split, so the grouping is
+attribute-based instead. `make test` runs PHPUnit twice in sequence: first
+excluding the `functional` group (Unit — fast, no I/O), then including only
+it (Functional — slower, needs the live test database/HTTP stack) — so a
+Unit failure fails the build before any Functional test even starts. All 4
+existing test classes (`FlightRepositoryTest`, `SeatRepositoryTest` — both
+`KernelTestCase`, hitting the database; `FlightControllerTest`,
+`HealthControllerTest` — both `WebTestCase`, making HTTP requests) are
+tagged `#[Group('functional')]`; there are no pure Unit tests yet, so the
+first `phpunit` invocation passes `--do-not-fail-on-empty-test-suite` (an
+empty Unit run isn't a failure — an empty Functional run, which doesn't get
+that flag, would be).
+
 **Use PHPUnit data providers instead of copy-pasted near-identical test
 methods.** When several test cases exercise the same code path and differ
 only in input/expected values (e.g. several different invalid
