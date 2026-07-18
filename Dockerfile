@@ -43,4 +43,10 @@ ENV FRANKENPHP_WORKER_CONFIG=watch
 
 RUN mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
+# pcov is a coverage driver, only needed for `make coverage` (dev/CI use);
+# it has no business in a hypothetical production image built straight from
+# frankenphp_base, so it's installed here rather than in the shared
+# extension list above.
+RUN install-php-extensions pcov
+
 CMD [ "frankenphp", "run", "--config", "/etc/frankenphp/Caddyfile", "--watch" ]

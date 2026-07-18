@@ -301,7 +301,9 @@ files) because `needs:` dependencies only work within a single workflow —
   `.github/actions/bootstrap-stack` (a local composite action: log in to
   GHCR, pull, `docker compose up -d`, poll `/health` until ready). It's the
   only job that talks to a real database (the test schema), so it's the
-  only one that pays for the image build + full compose stack.
+  only one that pays for the image build + full compose stack. It runs
+  `make coverage` (not `make test` — see below) and uploads the resulting
+  Clover reports to Codecov via `codecov/codecov-action`.
 - **`composer-lint`**, **`coding-standards`**, **`static-analysis`** — run
   on bare PHP instead: `actions/checkout` → `shivammathur/setup-php`
   (installs PHP 8.4 directly on the runner, no Docker/image involved) →
@@ -352,16 +354,70 @@ relied on for local dev/tests, rather than reimplementing
 composer-install/migration steps.
 
 The actual tool invocations live in the root `Makefile` (`make cs`, `make
-stan`, `make composer-lint`, `make test`), not inline in `ci.yml`. This
-keeps the exact same command available for local use (`make test` is the
-documented way to run tests — see below) and in CI, so the two never drift.
-`cs`, `stan`, and `composer-lint` run their tool through a `DOCKER_EXEC`
-Makefile variable that defaults to `docker compose exec -T
+stan`, `make composer-lint`, `make test`, `make coverage`), not inline in
+`ci.yml`. This keeps the exact same command available for local use (`make
+test` is the documented way to run tests — see below) and in CI, so the two
+never drift. `cs`, `stan`, and `composer-lint` run their tool through a
+`DOCKER_EXEC` Makefile variable that defaults to `docker compose exec -T
 aeronuk-flight-search` (local dev, and matching prior CI behavior); the
 three bare-PHP CI jobs override it to empty (`make stan DOCKER_EXEC=`) so
 the same target runs the tool directly against the runner's own PHP instead.
-`test` doesn't take this variable — it's Docker/compose-only, since
-`phpunit` is the one job that needs the live database.
+`test` and `coverage` don't take this variable — they're Docker/compose-only,
+since `phpunit` is the one job that needs the live database.
+
+### Coverage (Codecov)
+
+`make coverage` mirrors `make test`'s Unit-then-Functional `phpunit`
+invocations (see "Tests" above) but adds `--coverage-clover` to each pass,
+writing `var/coverage/unit.clover.xml` and `var/coverage/functional.clover.xml`
+(both under the gitignored `var/`, matching `phpunit.dist.xml`'s existing
+`<source>` block that scopes coverage to `src/`, not `tests/`). `make test`
+itself is deliberately left coverage-free, since collecting coverage adds
+overhead that isn't worth paying on every local test run.
+
+Collecting coverage requires a coverage driver, which isn't installed by
+default. **`pcov`** is installed via `RUN install-php-extensions pcov` in
+the `frankenphp_dev` stage of the `Dockerfile` only — *not* added to
+`frankenphp_base`'s shared extension list — because a coverage driver has no
+business in a hypothetical future production image built straight from
+`frankenphp_base`. `pcov` (not Xdebug) is used because it's purpose-built
+for fast coverage collection with much lower overhead, and step debugging
+isn't needed in CI.
+
+In CI, the `phpunit` job runs `make coverage` in place of `make test` (a
+strict superset — same tests, plus coverage output). Because
+`docker-compose.yml` mounts an anonymous volume over `/app/var`
+(`- /app/var`, layered on top of the `.:/app` bind mount specifically to
+keep container-only state like `var/cache` out of the checkout), the Clover
+files land inside the container but never appear on the runner's own
+filesystem — a `docker compose cp aeronuk-flight-search:/app/var/coverage/.
+"$RUNNER_TEMP/coverage/"` step copies them out before the upload step can
+see them. This copies to `$RUNNER_TEMP`, not a path under the checkout:
+setting up that anonymous volume requires Docker to create the `/app/var`
+mountpoint on the bind-mounted host directory first, and on Linux runners it
+does so as root — leaving a root-owned, runner-unwritable `./var` behind for
+the rest of the job (invisible in local testing on Docker Desktop for Mac,
+where the VM's filesystem translation layer normalizes ownership back to the
+host user — this bit us once already in CI; don't assume local reproduces
+it). Both files are then uploaded to Codecov via `codecov/codecov-action`,
+authenticated with `${{ secrets.CODECOV_TOKEN }}`. `codecov.yml` at the repo
+root sets the project coverage target to 80%.
+
+Two prerequisites for this to actually work are manual, repo-admin actions
+outside the scope of any PR, and can't be completed by editing workflow
+files alone:
+
+1. **Codecov repo activation + `CODECOV_TOKEN` secret.** This repo needs to
+   be activated at codecov.io (sign in with GitHub, add the repo) and a
+   `CODECOV_TOKEN` added as a GitHub Actions repository secret — Codecov's
+   tokenless upload path is unreliable (rate-limited, deprecated for most
+   cases) so this is a real prerequisite, not optional polish. Until it's
+   done, the "Upload coverage to Codecov" step in the `phpunit` job is
+   expected to fail; that's not a bug in the workflow.
+2. **Branch protection.** Codecov's coverage check only *reports* a commit
+   status by default. Making it actually block merges to `main` requires
+   adding it as a required status check in this repo's branch protection
+   settings, once it's reporting successfully.
 
 Tooling:
 - **`doctrine/coding-standard`** (PHP_CodeSniffer, not PHP-CS-Fixer — the

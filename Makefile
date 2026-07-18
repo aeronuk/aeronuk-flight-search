@@ -27,6 +27,17 @@ test: ## Reset the test database and run PHPUnit (Unit first, then Functional)
 	docker compose exec -T aeronuk-flight-search php bin/phpunit --exclude-group functional --do-not-fail-on-empty-test-suite
 	docker compose exec -T aeronuk-flight-search php bin/phpunit --group functional
 
+.PHONY: coverage
+coverage: ## Reset the test database and run PHPUnit with coverage (Unit first, then Functional)
+	docker compose exec -T aeronuk-flight-search php bin/console doctrine:database:drop --force --env=test || true
+	docker compose exec -T aeronuk-flight-search php bin/console doctrine:database:create --env=test
+	docker compose exec -T aeronuk-flight-search php bin/console doctrine:migrations:migrate --no-interaction --env=test
+	# Same Unit-then-Functional split as `test` above, but each pass also
+	# writes its own Clover report so both are uploaded to Codecov in CI
+	# (see .github/workflows/ci.yml and CLAUDE.md's CI section).
+	docker compose exec -T aeronuk-flight-search php bin/phpunit --exclude-group functional --do-not-fail-on-empty-test-suite --coverage-clover var/coverage/unit.clover.xml
+	docker compose exec -T aeronuk-flight-search php bin/phpunit --group functional --coverage-clover var/coverage/functional.clover.xml
+
 .PHONY: cs
 cs: ## Check coding standard (phpcs, Doctrine ruleset)
 	$(DOCKER_EXEC) vendor/bin/phpcs
