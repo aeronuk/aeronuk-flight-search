@@ -1,5 +1,7 @@
 {
     "symbol-whitelist": [
+        "Doctrine\\DBAL\\Schema\\Schema",
+        "Doctrine\\Migrations\\AbstractMigration",
         "Doctrine\\Persistence\\ObjectManager",
         "Symfony\\Component\\DependencyInjection\\Attribute\\Autowire",
         "Symfony\\Component\\EventDispatcher\\Attribute\\AsEventListener",

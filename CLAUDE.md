@@ -345,11 +345,18 @@ Tooling:
 - **`composer-require-checker`** (config: `composer-require-checker.json`)
   checks for undeclared/implicit dependencies. Its whitelist covers symbols
   genuinely provided transitively by `symfony/framework-bundle` /
-  `doctrine/orm` that Symfony Flex itself never adds as direct requires
-  (`HttpFoundation`, `HttpKernel`, `DependencyInjection` attributes,
-  `Routing` attributes, `Doctrine\Persistence\ObjectManager`). One real gap
-  it did catch: `doctrine/doctrine-fixtures-bundle` was in `require-dev`
-  even though `src/Infra/DataFixtures/FlightFixtures.php` sits under the
-  main (non-dev) PSR-4 autoload root — it's now in `require`.
+  `doctrine/orm` / `doctrine/doctrine-migrations-bundle` that Symfony Flex
+  itself never adds as direct requires (`HttpFoundation`, `HttpKernel`,
+  `DependencyInjection` attributes, `Routing` attributes,
+  `Doctrine\Persistence\ObjectManager`, `Doctrine\DBAL\Schema\Schema`,
+  `Doctrine\Migrations\AbstractMigration`). One real gap it did catch:
+  `doctrine/doctrine-fixtures-bundle` was in `require-dev` even though
+  `src/Infra/DataFixtures/FlightFixtures.php` sits under the main (non-dev)
+  PSR-4 autoload root — it's now in `require`. Moving `migrations/` under
+  `src/Infra/Migrations` (also on that autoload root) newly brought
+  `Doctrine\DBAL\Schema\Schema` and `Doctrine\Migrations\AbstractMigration`
+  into scope for the same reason — added to the whitelist rather than
+  `require`, since unlike the fixtures bundle these really are only used by
+  auto-generated migration code, not application code.
 - **`ergebnis/composer-normalize`** enforces consistent `composer.json`
   key ordering/formatting (`composer normalize --dry-run` in CI).
