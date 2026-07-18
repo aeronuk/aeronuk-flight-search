@@ -63,7 +63,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "AeroNuk\\FlightSearch\\Tests\\": "tests/"
+            "AeroNuk\\FlightSearch\\": "tests/"
         }
     },
     "config": {

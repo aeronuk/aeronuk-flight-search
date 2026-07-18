@@ -2,13 +2,8 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\Domain;
+namespace AeroNuk\FlightSearch\Domain;
 
-use AeroNuk\FlightSearch\Domain\AirportCode;
-use AeroNuk\FlightSearch\Domain\Flight;
-use AeroNuk\FlightSearch\Domain\Money;
-use AeroNuk\FlightSearch\Domain\Seat;
-use AeroNuk\FlightSearch\Domain\SeatRepository;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
