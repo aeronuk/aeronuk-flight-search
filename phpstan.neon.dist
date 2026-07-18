@@ -3,6 +3,12 @@ parameters:
     paths:
         - src
         - tests
+    excludePaths:
+        # Auto-generated Doctrine migrations, previously the top-level
+        # migrations/ directory, were never covered by static analysis
+        # before moving under src/ — keep it that way rather than newly
+        # subjecting generated code to level: max.
+        - src/Infra/Migrations
     symfony:
         containerXmlPath: var/cache/dev/AeroNuk_FlightSearch_KernelDevDebugContainer.xml
     doctrine:
