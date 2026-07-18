@@ -7,14 +7,15 @@ namespace AeroNuk\FlightSearch\Controller;
 use AeroNuk\FlightSearch\Exception\FlightNotFound;
 use AeroNuk\FlightSearch\Repository\FlightRepository;
 use AeroNuk\FlightSearch\Repository\SeatRepository;
+use AeroNuk\FlightSearch\Request\FlightSearchRequest;
 use AeroNuk\FlightSearch\ValueObject\AirportCode;
 use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Attribute\MapQueryString;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Serializer\SerializerInterface;
 
-use function strtoupper;
+use function assert;
 
 class FlightController
 {
@@ -26,39 +27,19 @@ class FlightController
     }
 
     #[Route('/api/flights', name: 'flights_search', methods: ['GET'])]
-    public function search(Request $request): JsonResponse
-    {
-        $originParam = $request->query->get('origin');
-        if ($originParam === null) {
-            return new JsonResponse(['error' => 'origin is required'], 400);
-        }
+    public function search(
+        #[MapQueryString(validationFailedStatusCode: 400)]
+        FlightSearchRequest $request,
+    ): JsonResponse {
+        assert($request->origin !== null);
+        assert($request->destination !== null);
+        assert($request->date !== null);
 
-        $origin = AirportCode::tryFrom(strtoupper($originParam));
-        if ($origin === null) {
-            return new JsonResponse(['error' => 'origin must be a known 3-letter airport code'], 400);
-        }
-
-        $destinationParam = $request->query->get('destination');
-        if ($destinationParam === null) {
-            return new JsonResponse(['error' => 'destination is required'], 400);
-        }
-
-        $destination = AirportCode::tryFrom(strtoupper($destinationParam));
-        if ($destination === null) {
-            return new JsonResponse(['error' => 'destination must be a known 3-letter airport code'], 400);
-        }
-
-        $dateParam = $request->query->get('date');
-        if ($dateParam === null) {
-            return new JsonResponse(['error' => 'date is required'], 400);
-        }
-
-        $date = DateTimeImmutable::createFromFormat('Y-m-d', $dateParam);
-        if ($date === false) {
-            return new JsonResponse(['error' => 'date must be in YYYY-MM-DD format'], 400);
-        }
-
-        $flights = $this->flightRepository->search($origin, $destination, $date);
+        $flights = $this->flightRepository->search(
+            AirportCode::from($request->origin),
+            AirportCode::from($request->destination),
+            new DateTimeImmutable($request->date),
+        );
 
         return JsonResponse::fromJsonString($this->serializer->serialize($flights, 'json'));
     }
