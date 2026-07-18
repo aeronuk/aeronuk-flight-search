@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\ValueObject;
+namespace AeroNuk\FlightSearch\Domain;
 
 enum AirportCode: string
 {

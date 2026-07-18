@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Exception;
+namespace AeroNuk\FlightSearch\Domain;
 
 use RuntimeException;
 

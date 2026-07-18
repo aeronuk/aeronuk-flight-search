@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Entity;
+namespace AeroNuk\FlightSearch\Domain;
 
-use AeroNuk\FlightSearch\ValueObject\AirportCode;
-use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 use InvalidArgumentException;

@@ -2,10 +2,8 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Repository;
+namespace AeroNuk\FlightSearch\Domain;
 
-use AeroNuk\FlightSearch\Entity\Flight;
-use AeroNuk\FlightSearch\Entity\Seat;
 use Doctrine\ORM\EntityManagerInterface;
 
 class SeatRepository
