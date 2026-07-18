@@ -7,10 +7,12 @@ namespace AeroNuk\FlightSearch\Domain;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
+#[Group('functional')]
 class FlightRepositoryTest extends KernelTestCase
 {
     use ResetsDatabase;

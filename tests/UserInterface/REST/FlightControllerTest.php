@@ -13,11 +13,13 @@ use AeroNuk\FlightSearch\Tests\ResetsDatabase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Uid\Uuid;
 
+#[Group('functional')]
 class FlightControllerTest extends WebTestCase
 {
     use DecodesJsonResponse;
