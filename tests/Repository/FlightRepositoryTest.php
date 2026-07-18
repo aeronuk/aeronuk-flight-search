@@ -11,6 +11,7 @@ use AeroNuk\FlightSearch\ValueObject\AirportCode;
 use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
@@ -50,7 +51,8 @@ class FlightRepositoryTest extends KernelTestCase
         return $flight;
     }
 
-    public function testSearchReturnsFlightsMatchingOriginDestinationAndDate(): void
+    #[Test]
+    public function searchReturnsFlightsMatchingOriginDestinationAndDate(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
         $this->persistFlight('AN2', AirportCode::JFK, AirportCode::SFO, '2026-07-01 12:00:00');
@@ -62,7 +64,8 @@ class FlightRepositoryTest extends KernelTestCase
         self::assertSame('AN1', $results[0]->flightNumber);
     }
 
-    public function testSearchReturnsEmptyArrayWhenNoFlightMatches(): void
+    #[Test]
+    public function searchReturnsEmptyArrayWhenNoFlightMatches(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
 
