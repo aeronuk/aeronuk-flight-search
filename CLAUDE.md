@@ -375,6 +375,19 @@ writing `var/coverage/unit.clover.xml` and `var/coverage/functional.clover.xml`
 itself is deliberately left coverage-free, since collecting coverage adds
 overhead that isn't worth paying on every local test run.
 
+`phpunit.dist.xml`'s `<source>` block also `<exclude>`s `src/Infra/Migrations`
+and `src/Infra/DataFixtures` from the coverage denominator. Both run for
+real — migrations via `doctrine:migrations:migrate`, fixtures via
+`doctrine:fixtures:load`, both as separate `bin/console` invocations outside
+phpunit (`docker-entrypoint.sh` runs them on every container start; `make
+coverage` runs the migration before every test pass) — but `pcov` only
+instruments code actually executed *through* phpunit, so Codecov reported
+both as a flat 0% regardless of whether they worked. Excluding them,
+consistently with `phpstan.neon.dist`'s and `phpcs.xml.dist`'s existing
+`src/Infra/Migrations` exclusions (see "Settled decisions" above), scopes
+the coverage percentage to code this repo actually writes tests against
+instead of infrastructure that structurally can't be measured that way.
+
 Collecting coverage requires a coverage driver, which isn't installed by
 default. **`pcov`** is installed via `RUN install-php-extensions pcov` in
 the `frankenphp_dev` stage of the `Dockerfile` only — *not* added to
