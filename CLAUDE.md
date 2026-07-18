@@ -250,14 +250,18 @@ folder-based `tests/Unit` vs `tests/Functional` split, so the grouping is
 attribute-based instead. `make test` runs PHPUnit twice in sequence: first
 excluding the `functional` group (Unit — fast, no I/O), then including only
 it (Functional — slower, needs the live test database/HTTP stack) — so a
-Unit failure fails the build before any Functional test even starts. All 4
-existing test classes (`FlightRepositoryTest`, `SeatRepositoryTest` — both
+Unit failure fails the build before any Functional test even starts. The 4
+Functional test classes (`FlightRepositoryTest`, `SeatRepositoryTest` — both
 `KernelTestCase`, hitting the database; `FlightControllerTest`,
 `HealthControllerTest` — both `WebTestCase`, making HTTP requests) are
-tagged `#[Group('functional')]`; there are no pure Unit tests yet, so the
-first `phpunit` invocation passes `--do-not-fail-on-empty-test-suite` (an
-empty Unit run isn't a failure — an empty Functional run, which doesn't get
-that flag, would be).
+tagged `#[Group('functional')]`. The Domain/`UserInterface/REST` Unit tests
+(`MoneyTest`, `FlightTest`, `AirportCodeTest`, `FlightNotFoundTest`,
+`SeatTest`, `FlightSearchRequestTest`, `ValidationExceptionListenerTest`)
+are plain `PHPUnit\Framework\TestCase`, untagged. The first `phpunit`
+invocation still passes `--do-not-fail-on-empty-test-suite` as a guard in
+case the Unit suite is ever empty again (an empty Unit run isn't meant to
+be a failure — an empty Functional run, which doesn't get that flag, would
+be).
 
 **Use PHPUnit data providers instead of copy-pasted near-identical test
 methods.** When several test cases exercise the same code path and differ
