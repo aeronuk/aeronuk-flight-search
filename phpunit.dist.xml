@@ -32,6 +32,23 @@
             <directory>src</directory>
         </include>
 
+        <exclude>
+            <!-- Auto-generated Doctrine migrations and seed-data fixtures
+                 aren't run through phpunit — migrations run as a separate
+                 `doctrine:migrations:migrate` process, and fixtures via
+                 `doctrine:fixtures:load` — so pcov never instruments them.
+                 Both already run for real on every container start and
+                 before every test pass, but that happens outside phpunit,
+                 not via tests against this code. Excluding them keeps the
+                 coverage denominator scoped to code this repo actually
+                 tests, consistently with `phpstan.neon.dist`'s and
+                 `phpcs.xml.dist`'s existing `src/Infra/Migrations`
+                 exclusions for the same "never covered, keep it that way"
+                 reasoning. -->
+            <directory>src/Infra/Migrations</directory>
+            <directory>src/Infra/DataFixtures</directory>
+        </exclude>
+
         <deprecationTrigger>
             <method>Doctrine\Deprecations\Deprecation::trigger</method>
             <method>Doctrine\Deprecations\Deprecation::delegateTriggerToBackend</method>
