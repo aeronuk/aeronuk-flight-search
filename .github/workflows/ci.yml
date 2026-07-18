@@ -147,15 +147,21 @@ jobs:
         # writes under /app/var/coverage never appear on the runner's
         # filesystem on their own. codecov-action runs on the runner, not
         # in the container, so the reports have to be copied out first.
+        #
+        # Copied to RUNNER_TEMP, not a path under the checkout: setting up
+        # that anonymous volume requires Docker to create the /app/var
+        # mountpoint on the bind-mounted host directory first, and it does
+        # so as root — leaving ./var root-owned and unwritable by the
+        # runner user for the rest of the job.
         run: |
-          mkdir -p var/coverage
-          docker compose cp aeronuk-flight-search:/app/var/coverage/. ./var/coverage/
+          mkdir -p "$RUNNER_TEMP/coverage"
+          docker compose cp aeronuk-flight-search:/app/var/coverage/. "$RUNNER_TEMP/coverage/"
 
       - name: "Upload coverage to Codecov"
         uses: "codecov/codecov-action@v7.0.0"
         with:
           token: "${{ secrets.CODECOV_TOKEN }}"
-          files: "var/coverage/unit.clover.xml,var/coverage/functional.clover.xml"
+          files: "${{ runner.temp }}/coverage/unit.clover.xml,${{ runner.temp }}/coverage/functional.clover.xml"
 
       - name: "Stop stack"
         if: always()

@@ -391,8 +391,15 @@ strict superset — same tests, plus coverage output). Because
 keep container-only state like `var/cache` out of the checkout), the Clover
 files land inside the container but never appear on the runner's own
 filesystem — a `docker compose cp aeronuk-flight-search:/app/var/coverage/.
-./var/coverage/` step copies them out before the upload step can see them.
-Both files are then uploaded to Codecov via `codecov/codecov-action`,
+"$RUNNER_TEMP/coverage/"` step copies them out before the upload step can
+see them. This copies to `$RUNNER_TEMP`, not a path under the checkout:
+setting up that anonymous volume requires Docker to create the `/app/var`
+mountpoint on the bind-mounted host directory first, and on Linux runners it
+does so as root — leaving a root-owned, runner-unwritable `./var` behind for
+the rest of the job (invisible in local testing on Docker Desktop for Mac,
+where the VM's filesystem translation layer normalizes ownership back to the
+host user — this bit us once already in CI; don't assume local reproduces
+it). Both files are then uploaded to Codecov via `codecov/codecov-action`,
 authenticated with `${{ secrets.CODECOV_TOKEN }}`. `codecov.yml` at the repo
 root sets the project coverage target to 80%.
 
