@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\DataFixtures;
+namespace AeroNuk\FlightSearch\Infra\DataFixtures;
 
-use AeroNuk\FlightSearch\Entity\Flight;
-use AeroNuk\FlightSearch\Entity\Seat;
-use AeroNuk\FlightSearch\ValueObject\AirportCode;
-use AeroNuk\FlightSearch\ValueObject\Money;
+use AeroNuk\FlightSearch\Domain\AirportCode;
+use AeroNuk\FlightSearch\Domain\Flight;
+use AeroNuk\FlightSearch\Domain\Money;
+use AeroNuk\FlightSearch\Domain\Seat;
 use DateTimeImmutable;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
