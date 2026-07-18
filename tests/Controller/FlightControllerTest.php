@@ -13,6 +13,7 @@ use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Uid\Uuid;
@@ -53,7 +54,8 @@ class FlightControllerTest extends WebTestCase
         return $flight;
     }
 
-    public function testSearchReturnsMatchingFlights(): void
+    #[Test]
+    public function searchReturnsMatchingFlights(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
         $this->persistFlight('AN2', AirportCode::ORD, AirportCode::SFO, '2026-07-02 08:00:00');
@@ -67,7 +69,8 @@ class FlightControllerTest extends WebTestCase
         self::assertSame('AN1', $data[0]['flightNumber']);
     }
 
-    public function testFlightPriceSerializesAsNestedMoneyObject(): void
+    #[Test]
+    public function flightPriceSerializesAsNestedMoneyObject(): void
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
 
@@ -78,8 +81,9 @@ class FlightControllerTest extends WebTestCase
         self::assertSame(['amount' => '199.99', 'currency' => 'USD'], $data[0]['price']);
     }
 
+    #[Test]
     #[DataProvider('invalidSearchQueryProvider')]
-    public function testSearchWithInvalidQueryReturns400(string $queryString): void
+    public function searchWithInvalidQueryReturns400(string $queryString): void
     {
         $this->client->request('GET', '/api/flights?' . $queryString);
 
@@ -102,7 +106,8 @@ class FlightControllerTest extends WebTestCase
         yield 'unknown destination airport code' => ['origin=JFK&destination=ZZZ&date=2026-07-01'];
     }
 
-    public function testSeatsHappyPath(): void
+    #[Test]
+    public function seatsHappyPath(): void
     {
         $flight = $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
         $this->em->persist(new Seat((string) Uuid::v7(), $flight, '12A', 'economy'));
@@ -118,7 +123,8 @@ class FlightControllerTest extends WebTestCase
         self::assertArrayNotHasKey('flight', $data[0]);
     }
 
-    public function testSeatsReturns404ForMissingFlight(): void
+    #[Test]
+    public function seatsReturns404ForMissingFlight(): void
     {
         $this->client->request('GET', '/api/flights/00000000-0000-0000-0000-000000000000/seats');
 
