@@ -45,75 +45,80 @@ jobs:
 
   composer-lint:
     name: "Composer lint"
-    needs: "build"
     runs-on: "ubuntu-latest"
     permissions:
       contents: "read"
-      packages: "read"
     steps:
       - name: "Checkout"
         uses: "actions/checkout@v7.0.0"
 
-      - name: "Bootstrap stack"
-        uses: "./.github/actions/bootstrap-stack"
+      - name: "Set up PHP"
+        uses: "shivammathur/setup-php@v2.37.2"
         with:
-          image: "${{ needs.build.outputs.image }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          php-version: "8.4"
+          extensions: "ctype, iconv, intl, bcmath"
+          coverage: "none"
+
+      - name: "Install dependencies"
+        uses: "ramsey/composer-install@v4.0.0"
 
       - name: "Composer lint"
-        run: "make composer-lint"
-
-      - name: "Stop stack"
-        if: always()
-        run: "docker compose down -v"
+        run: "make composer-lint DOCKER_EXEC="
 
   coding-standards:
     name: "Coding standards"
-    needs: "build"
     runs-on: "ubuntu-latest"
     permissions:
       contents: "read"
-      packages: "read"
     steps:
       - name: "Checkout"
         uses: "actions/checkout@v7.0.0"
 
-      - name: "Bootstrap stack"
-        uses: "./.github/actions/bootstrap-stack"
+      - name: "Set up PHP"
+        uses: "shivammathur/setup-php@v2.37.2"
         with:
-          image: "${{ needs.build.outputs.image }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          php-version: "8.4"
+          extensions: "ctype, iconv"
+          coverage: "none"
+
+      - name: "Install dependencies"
+        uses: "ramsey/composer-install@v4.0.0"
+        with:
+          # coding-standards doesn't need bcmath/intl (see CLAUDE.md's CI
+          # section) — composer-require-checker's transitive php-standard-
+          # library dependency does, but the whole locked composer.json
+          # (require-dev included) is still platform-checked on every
+          # `composer install`, regardless of which job runs it.
+          composer-options: "--ignore-platform-req=ext-bcmath --ignore-platform-req=ext-intl"
 
       - name: "Coding standards"
-        run: "make cs"
-
-      - name: "Stop stack"
-        if: always()
-        run: "docker compose down -v"
+        run: "make cs DOCKER_EXEC="
 
   static-analysis:
     name: "Static analysis"
-    needs: "build"
     runs-on: "ubuntu-latest"
     permissions:
       contents: "read"
-      packages: "read"
     steps:
       - name: "Checkout"
         uses: "actions/checkout@v7.0.0"
 
-      - name: "Bootstrap stack"
-        uses: "./.github/actions/bootstrap-stack"
+      - name: "Set up PHP"
+        uses: "shivammathur/setup-php@v2.37.2"
         with:
-          image: "${{ needs.build.outputs.image }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
+          php-version: "8.4"
+          extensions: "ctype, iconv"
+          coverage: "none"
+
+      - name: "Install dependencies"
+        uses: "ramsey/composer-install@v4.0.0"
+        with:
+          # Same reasoning as coding-standards above — phpstan itself
+          # doesn't need bcmath/intl either.
+          composer-options: "--ignore-platform-req=ext-bcmath --ignore-platform-req=ext-intl"
 
       - name: "Static analysis"
-        run: "make stan"
-
-      - name: "Stop stack"
-        if: always()
-        run: "docker compose down -v"
+        run: "make stan DOCKER_EXEC="
 
   phpunit:
     name: "PHPUnit tests"
