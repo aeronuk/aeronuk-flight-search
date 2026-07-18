@@ -15,11 +15,17 @@ up: ## Build and start the local dev stack
 	docker compose up --build
 
 .PHONY: test
-test: ## Reset the test database and run PHPUnit
+test: ## Reset the test database and run PHPUnit (Unit first, then Functional)
 	docker compose exec -T aeronuk-flight-search php bin/console doctrine:database:drop --force --env=test || true
 	docker compose exec -T aeronuk-flight-search php bin/console doctrine:database:create --env=test
 	docker compose exec -T aeronuk-flight-search php bin/console doctrine:migrations:migrate --no-interaction --env=test
-	docker compose exec -T aeronuk-flight-search php bin/phpunit
+	# Unit tests (everything not tagged #[Group('functional')]) run first and
+	# fail fast before the slower, DB/HTTP-backed Functional group starts.
+	# --do-not-fail-on-empty-test-suite: there are no pure Unit tests yet (see
+	# CLAUDE.md) — an empty Unit run isn't a failure, unlike an empty
+	# Functional run below, which would be.
+	docker compose exec -T aeronuk-flight-search php bin/phpunit --exclude-group functional --do-not-fail-on-empty-test-suite
+	docker compose exec -T aeronuk-flight-search php bin/phpunit --group functional
 
 .PHONY: cs
 cs: ## Check coding standard (phpcs, Doctrine ruleset)

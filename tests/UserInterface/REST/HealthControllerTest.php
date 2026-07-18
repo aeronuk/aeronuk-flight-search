@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\UserInterface\REST;
+namespace AeroNuk\FlightSearch\UserInterface\REST;
 
 use AeroNuk\FlightSearch\Tests\DecodesJsonResponse;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 
+#[Group('functional')]
 class HealthControllerTest extends WebTestCase
 {
     use DecodesJsonResponse;

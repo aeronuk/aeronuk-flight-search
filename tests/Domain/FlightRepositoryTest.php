@@ -2,19 +2,17 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\Domain;
+namespace AeroNuk\FlightSearch\Domain;
 
-use AeroNuk\FlightSearch\Domain\AirportCode;
-use AeroNuk\FlightSearch\Domain\Flight;
-use AeroNuk\FlightSearch\Domain\FlightRepository;
-use AeroNuk\FlightSearch\Domain\Money;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\Uid\Uuid;
 
+#[Group('functional')]
 class FlightRepositoryTest extends KernelTestCase
 {
     use ResetsDatabase;

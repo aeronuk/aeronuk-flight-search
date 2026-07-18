@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\UserInterface\REST;
+namespace AeroNuk\FlightSearch\UserInterface\REST;
 
 use AeroNuk\FlightSearch\Domain\AirportCode;
 use AeroNuk\FlightSearch\Domain\Flight;
@@ -13,11 +13,13 @@ use AeroNuk\FlightSearch\Tests\ResetsDatabase;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\Attributes\Test;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\Uid\Uuid;
 
+#[Group('functional')]
 class FlightControllerTest extends WebTestCase
 {
     use DecodesJsonResponse;
