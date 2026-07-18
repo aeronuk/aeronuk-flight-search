@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Tests\Controller;
+namespace AeroNuk\FlightSearch\Tests\UserInterface\REST;
 
-use AeroNuk\FlightSearch\Entity\Flight;
-use AeroNuk\FlightSearch\Entity\Seat;
+use AeroNuk\FlightSearch\Domain\AirportCode;
+use AeroNuk\FlightSearch\Domain\Flight;
+use AeroNuk\FlightSearch\Domain\Money;
+use AeroNuk\FlightSearch\Domain\Seat;
 use AeroNuk\FlightSearch\Tests\DecodesJsonResponse;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
-use AeroNuk\FlightSearch\ValueObject\AirportCode;
-use AeroNuk\FlightSearch\ValueObject\Money;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;

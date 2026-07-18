@@ -10,5 +10,11 @@
     <file>src</file>
     <file>tests</file>
 
+    <!-- Auto-generated Doctrine migrations, previously the top-level
+         migrations/ directory, were never covered by coding-standard checks
+         before moving under src/ — keep it that way rather than newly
+         subjecting generated code to the Doctrine ruleset. -->
+    <exclude-pattern>src/Infra/Migrations/*</exclude-pattern>
+
     <rule ref="Doctrine"/>
 </ruleset>

@@ -29,5 +29,8 @@ when@test:
             autoconfigure: true
             public: true
 
-        AeroNuk\FlightSearch\Repository\:
-            resource: '../src/Repository/'
+        AeroNuk\FlightSearch\Domain\FlightRepository:
+            public: true
+
+        AeroNuk\FlightSearch\Domain\SeatRepository:
+            public: true

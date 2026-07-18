@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\Entity;
+namespace AeroNuk\FlightSearch\Domain;
 
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Attribute\Ignore;

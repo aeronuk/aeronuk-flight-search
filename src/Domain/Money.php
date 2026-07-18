@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace AeroNuk\FlightSearch\ValueObject;
+namespace AeroNuk\FlightSearch\Domain;
 
 use Doctrine\ORM\Mapping as ORM;
 use InvalidArgumentException;
