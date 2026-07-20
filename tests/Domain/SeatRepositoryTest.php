@@ -34,8 +34,7 @@ class SeatRepositoryTest extends KernelTestCase
         $flightA = new Flight(
             (string) Uuid::v7(),
             'AN1',
-            AirportCode::JFK,
-            AirportCode::LAX,
+            new Route(AirportCode::JFK, AirportCode::LAX),
             new DateTimeImmutable('2026-07-01 08:00:00'),
             new DateTimeImmutable('2026-07-01 11:00:00'),
             new Money('199.99', 'USD'),
@@ -43,8 +42,7 @@ class SeatRepositoryTest extends KernelTestCase
         $flightB = new Flight(
             (string) Uuid::v7(),
             'AN2',
-            AirportCode::ORD,
-            AirportCode::SFO,
+            new Route(AirportCode::ORD, AirportCode::SFO),
             new DateTimeImmutable('2026-07-02 08:00:00'),
             new DateTimeImmutable('2026-07-02 10:00:00'),
             new Money('149.99', 'USD'),

@@ -25,16 +25,16 @@ class FlightRepository
     }
 
     /** @return Flight[] */
-    public function search(AirportCode $origin, AirportCode $destination, DateTimeImmutable $date): array
+    public function search(Route $route, DateTimeImmutable $date): array
     {
         return $this->em->createQueryBuilder()
             ->select('f')
             ->from(Flight::class, 'f')
-            ->andWhere('f.origin = :origin')
-            ->andWhere('f.destination = :destination')
+            ->andWhere('f.route.origin = :origin')
+            ->andWhere('f.route.destination = :destination')
             ->andWhere('f.departureTime BETWEEN :start AND :end')
-            ->setParameter('origin', $origin)
-            ->setParameter('destination', $destination)
+            ->setParameter('origin', $route->origin)
+            ->setParameter('destination', $route->destination)
             ->setParameter('start', $date->setTime(0, 0, 0))
             ->setParameter('end', $date->setTime(23, 59, 59))
             ->orderBy('f.departureTime', 'ASC')
