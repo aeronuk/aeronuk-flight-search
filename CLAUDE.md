@@ -50,6 +50,7 @@ src/
     SeatRepository.php                # DI service, findByFlight() returns Seat[]
     AirportCode.php                   # closed enum: LHR JFK LAX ORD SFO NRT
     Money.php                         # Doctrine embeddable: amount + currency
+    Route.php                         # Doctrine embeddable: origin + destination AirportCode
     FlightNotFound.php                # no "Exception" suffix; see naming convention below
   UserInterface/
     REST/
@@ -105,7 +106,7 @@ src/
 - **Entity/VO IDs are always passed in from the caller** — never generated
   inside a constructor. Keeps construction deterministic and testable.
 
-- **No getters on `Flight`/`Seat`/`Money`.** All properties are
+- **No getters on `Flight`/`Seat`/`Money`/`Route`.** All properties are
   `public readonly`. `symfony/serializer` reads them directly.
   `#[Ignore]` (to hide `Seat::$flight` from serialization) lives on the
   property, not a getter method.
@@ -122,6 +123,24 @@ src/
   - The Doctrine mapping `dir` in `config/packages/doctrine.yaml` must be
     `%kernel.project_dir%/src` (the whole `src/` tree), not just `src/Domain`,
     so `Money` in `src/Domain/` is discovered as a mapped embeddable.
+
+- **`Route` bundles `Flight`'s `origin`/`destination` into a single Doctrine
+  embeddable VO**, following `Money`'s exact pattern:
+  `Flight::$route` has `#[ORM\Embedded(class: Route::class, columnPrefix:
+  false)]`, and `Route`'s own `$origin`/`$destination` properties carry
+  explicit `#[ORM\Column(name: 'origin'/'destination', ...)]` so they map
+  onto the existing flat `origin`/`destination` columns — no migration
+  needed. `Route`'s constructor throws `InvalidArgumentException` when
+  `origin === destination`, mirroring `Flight`'s `departureTime >=
+  arrivalTime` guard. `FlightRepository::search()` takes a `Route` (not two
+  separate `AirportCode`s) and filters via the embedded path expressions
+  `f.route.origin`/`f.route.destination` in its DQL.
+  `UserInterface\REST\FlightController.php` already imports
+  `Symfony\Component\Routing\Attribute\Route` for its `#[Route(...)]` action
+  attributes, so it imports the domain class aliased as `use
+  AeroNuk\FlightSearch\Domain\Route as FlightRoute;` to avoid the short-name
+  collision — follow that same aliasing pattern in any other class that
+  needs both.
 
 - **`Flight`'s constructor rejects `departureTime >= arrivalTime`.**
 
@@ -255,7 +274,7 @@ Functional test classes (`FlightRepositoryTest`, `SeatRepositoryTest` — both
 `KernelTestCase`, hitting the database; `FlightControllerTest`,
 `HealthControllerTest` — both `WebTestCase`, making HTTP requests) are
 tagged `#[Group('functional')]`. The Domain/`UserInterface/REST` Unit tests
-(`MoneyTest`, `FlightTest`, `AirportCodeTest`, `FlightNotFoundTest`,
+(`MoneyTest`, `RouteTest`, `FlightTest`, `AirportCodeTest`, `FlightNotFoundTest`,
 `SeatTest`, `FlightSearchRequestTest`, `ValidationExceptionListenerTest`)
 are plain `PHPUnit\Framework\TestCase`, untagged. The first `phpunit`
 invocation still passes `--do-not-fail-on-empty-test-suite` as a guard in
