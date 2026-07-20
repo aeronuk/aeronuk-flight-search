@@ -29,8 +29,16 @@ when@test:
             autoconfigure: true
             public: true
 
+        AeroNuk\FlightSearch\Infra\DoctrineFlightRepository:
+            public: true
+
+        AeroNuk\FlightSearch\Infra\DoctrineSeatRepository:
+            public: true
+
         AeroNuk\FlightSearch\Domain\FlightRepository:
+            alias: AeroNuk\FlightSearch\Infra\DoctrineFlightRepository
             public: true
 
         AeroNuk\FlightSearch\Domain\SeatRepository:
+            alias: AeroNuk\FlightSearch\Infra\DoctrineSeatRepository
             public: true

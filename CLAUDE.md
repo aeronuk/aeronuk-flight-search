@@ -35,19 +35,20 @@ Unknown flight ID → `404`.
 ## Source layout
 
 `src/` is organized by architectural layer, not by Symfony class type:
-`Domain` (entities, repositories, value objects, domain exceptions),
-`UserInterface/REST` (everything serving the HTTP API), and `Infra`
-(Doctrine tooling — migrations, fixtures). `Kernel.php` is the one
-exception, staying unmoved at the `src/` root since it's Symfony's
-framework bootstrap class, not part of the three-layer split.
+`Domain` (entities, repository interfaces, value objects, domain
+exceptions), `UserInterface/REST` (everything serving the HTTP API), and
+`Infra` (Doctrine-backed repository implementations, plus migrations and
+fixtures). `Kernel.php` is the one exception, staying unmoved at the `src/`
+root since it's Symfony's framework bootstrap class, not part of the
+three-layer split.
 
 ```
 src/
   Domain/                             # flat — no Entity/Repository/ValueObject/Exception subfolders
     Flight.php                        # public readonly properties, no getters
     Seat.php                          # public readonly, $flight eager-fetched
-    FlightRepository.php              # DI service, not ServiceEntityRepository
-    SeatRepository.php                # DI service, findByFlight() returns Seat[]
+    FlightRepository.php              # interface: get(), search() — implemented in Infra
+    SeatRepository.php                # interface: findByFlight() returns Seat[] — implemented in Infra
     AirportCode.php                   # closed enum: LHR JFK LAX ORD SFO NRT
     Money.php                         # Doctrine embeddable: amount + currency
     Route.php                         # Doctrine embeddable: origin + destination AirportCode
@@ -59,6 +60,8 @@ src/
       FlightSearchRequest.php         # #[MapQueryString] DTO for GET /api/flights, Symfony Validator constraints
       ValidationExceptionListener.php # converts #[MapQueryString] validation failures to {"error": ...}
   Infra/
+    DoctrineFlightRepository.php      # implements Domain\FlightRepository, not ServiceEntityRepository
+    DoctrineSeatRepository.php        # implements Domain\SeatRepository, not ServiceEntityRepository
     DataFixtures/
       FlightFixtures.php              # seed data; only loads in dev/test
     Migrations/
@@ -74,22 +77,31 @@ src/
 
 - **`src/` is organized by architectural layer (`Domain` /
   `UserInterface/REST` / `Infra`), not by Symfony class type.** See "Source
-  layout" above. `Domain` classes (entities, repositories, value objects,
-  the domain exception) sit **flat** directly under `src/Domain/` — no
-  `Entity`/`Repository`/`ValueObject`/`Exception` subfolders — all sharing
-  one `AeroNuk\FlightSearch\Domain` namespace; `tests/Domain/` mirrors that
-  flatness. `config/packages/doctrine_migrations.yaml`'s `migrations_paths`
-  points at `src/Infra/Migrations` (previously the top-level `migrations/`
-  directory); `frankenphp/docker-entrypoint.sh`'s migrations-present check
-  was updated to match. Auto-generated migrations are deliberately excluded
-  from `phpstan.neon.dist`/`phpcs.xml.dist` — they were never linted or
-  analyzed when they lived outside `src/`, and moving them in-tree isn't
-  meant to newly subject generated code to `level: max` / the Doctrine
-  ruleset. `config/services.yaml`'s `when@test` block can no longer make
-  "just the repositories" public via a directory resource (there's no
-  `Repository/` subfolder left to scope to) — it declares
-  `AeroNuk\FlightSearch\Domain\FlightRepository`/`SeatRepository` public
-  explicitly instead, one service at a time.
+  layout" above. `Domain` classes (entities, repository interfaces, value
+  objects, the domain exception) sit **flat** directly under `src/Domain/`
+  — no `Entity`/`Repository`/`ValueObject`/`Exception` subfolders — all
+  sharing one `AeroNuk\FlightSearch\Domain` namespace; `tests/Domain/`
+  mirrors that flatness. `config/packages/doctrine_migrations.yaml`'s
+  `migrations_paths` points at `src/Infra/Migrations` (previously the
+  top-level `migrations/` directory); `frankenphp/docker-entrypoint.sh`'s
+  migrations-present check was updated to match. Auto-generated migrations
+  are deliberately excluded from `phpstan.neon.dist`/`phpcs.xml.dist` —
+  they were never linted or analyzed when they lived outside `src/`, and
+  moving them in-tree isn't meant to newly subject generated code to
+  `level: max` / the Doctrine ruleset. That exclusion is scoped to
+  `src/Infra/Migrations` specifically, not the whole `Infra` directory —
+  `Infra`'s hand-written `Doctrine*Repository` classes (see below) are real,
+  non-generated application code and are linted/analyzed exactly like
+  `Domain`/`UserInterface`; only the auto-generated migrations are exempt.
+  `config/services.yaml`'s `when@test` block can no longer make "just the
+  repositories" public via a directory resource (there's no `Repository/`
+  subfolder left to scope to, and `Domain\FlightRepository`/`SeatRepository`
+  are interfaces, not instantiable services) — it declares
+  `AeroNuk\FlightSearch\Infra\DoctrineFlightRepository`/`DoctrineSeatRepository`
+  public explicitly instead, plus a public alias from each `Domain`
+  interface to its `Infra` implementation, so
+  `self::getContainer()->get(FlightRepository::class)` in
+  `FlightRepositoryTest`/`SeatRepositoryTest` keeps resolving unchanged.
 
 - **Hand-rolled controllers + Doctrine ORM, not API Platform.** The two
   endpoints are simple explicit searches, not generic resource CRUD.
@@ -99,9 +111,16 @@ src/
   deliberate decision, not a default drift.
 
 - **Repositories are plain DI services, not `ServiceEntityRepository`
-  subclasses.** `FlightRepository` and `SeatRepository` take
-  `EntityManagerInterface` via constructor injection. Entities have no
-  `repositoryClass` attribute.
+  subclasses.** `Domain\FlightRepository`/`Domain\SeatRepository` are
+  interfaces; `Infra\DoctrineFlightRepository`/`Infra\DoctrineSeatRepository`
+  are their sole implementations and take `EntityManagerInterface` via
+  constructor injection, exactly as the (now-renamed) concrete classes
+  always did. Introducing the interfaces is additive, not a reversal of this
+  decision — the implementations still don't extend `ServiceEntityRepository`.
+  Entities have no `repositoryClass` attribute. `FlightController` and other
+  consumers type-hint the `Domain` interfaces; Symfony autowires each to its
+  single implementing `Infra` service automatically (no explicit service
+  config needed outside the `when@test` public aliasing described above).
 
 - **Entity/VO IDs are always passed in from the caller** — never generated
   inside a constructor. Keeps construction deterministic and testable.
