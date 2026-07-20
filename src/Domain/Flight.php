@@ -18,10 +18,8 @@ class Flight
         public readonly string $id,
         #[ORM\Column(length: 20)]
         public readonly string $flightNumber,
-        #[ORM\Column(type: 'string', length: 3, enumType: AirportCode::class)]
-        public readonly AirportCode $origin,
-        #[ORM\Column(type: 'string', length: 3, enumType: AirportCode::class)]
-        public readonly AirportCode $destination,
+        #[ORM\Embedded(class: Route::class, columnPrefix: false)]
+        public readonly Route $route,
         #[ORM\Column]
         public readonly DateTimeImmutable $departureTime,
         #[ORM\Column]

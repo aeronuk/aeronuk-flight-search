@@ -7,6 +7,7 @@ namespace AeroNuk\FlightSearch\UserInterface\REST;
 use AeroNuk\FlightSearch\Domain\AirportCode;
 use AeroNuk\FlightSearch\Domain\Flight;
 use AeroNuk\FlightSearch\Domain\Money;
+use AeroNuk\FlightSearch\Domain\Route;
 use AeroNuk\FlightSearch\Domain\Seat;
 use AeroNuk\FlightSearch\Tests\DecodesJsonResponse;
 use AeroNuk\FlightSearch\Tests\ResetsDatabase;
@@ -44,8 +45,7 @@ class FlightControllerTest extends WebTestCase
         $flight = new Flight(
             (string) Uuid::v7(),
             $number,
-            $origin,
-            $destination,
+            new Route($origin, $destination),
             new DateTimeImmutable($departure),
             new DateTimeImmutable($departure . ' +2 hours'),
             new Money('199.99', 'USD'),

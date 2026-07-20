@@ -7,6 +7,7 @@ namespace AeroNuk\FlightSearch\Infra\DataFixtures;
 use AeroNuk\FlightSearch\Domain\AirportCode;
 use AeroNuk\FlightSearch\Domain\Flight;
 use AeroNuk\FlightSearch\Domain\Money;
+use AeroNuk\FlightSearch\Domain\Route;
 use AeroNuk\FlightSearch\Domain\Seat;
 use DateTimeImmutable;
 use Doctrine\Bundle\FixturesBundle\Fixture;
@@ -69,8 +70,7 @@ class FlightFixtures extends Fixture
             $flight = new Flight(
                 (string) Uuid::v7(),
                 $number,
-                $origin,
-                $destination,
+                new Route($origin, $destination),
                 new DateTimeImmutable($departure),
                 new DateTimeImmutable($arrival),
                 new Money($amount, $currency),

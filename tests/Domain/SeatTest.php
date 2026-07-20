@@ -15,8 +15,7 @@ class SeatTest extends TestCase
         return new Flight(
             'flight-1',
             'AN101',
-            AirportCode::JFK,
-            AirportCode::LAX,
+            new Route(AirportCode::JFK, AirportCode::LAX),
             new DateTimeImmutable('2026-07-01 08:00:00'),
             new DateTimeImmutable('2026-07-01 11:30:00'),
             new Money('299.99', 'USD'),

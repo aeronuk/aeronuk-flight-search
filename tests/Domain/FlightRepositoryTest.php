@@ -37,8 +37,7 @@ class FlightRepositoryTest extends KernelTestCase
         $flight = new Flight(
             (string) Uuid::v7(),
             $number,
-            $origin,
-            $destination,
+            new Route($origin, $destination),
             new DateTimeImmutable($departure),
             new DateTimeImmutable($departure . ' +2 hours'),
             new Money('199.99', 'USD'),
@@ -56,7 +55,10 @@ class FlightRepositoryTest extends KernelTestCase
         $this->persistFlight('AN2', AirportCode::JFK, AirportCode::SFO, '2026-07-01 12:00:00');
         $this->persistFlight('AN3', AirportCode::JFK, AirportCode::LAX, '2026-07-02 08:00:00');
 
-        $results = $this->repository->search(AirportCode::JFK, AirportCode::LAX, new DateTimeImmutable('2026-07-01'));
+        $results = $this->repository->search(
+            new Route(AirportCode::JFK, AirportCode::LAX),
+            new DateTimeImmutable('2026-07-01'),
+        );
 
         self::assertCount(1, $results);
         self::assertSame('AN1', $results[0]->flightNumber);
@@ -67,7 +69,10 @@ class FlightRepositoryTest extends KernelTestCase
     {
         $this->persistFlight('AN1', AirportCode::JFK, AirportCode::LAX, '2026-07-01 08:00:00');
 
-        $results = $this->repository->search(AirportCode::ORD, AirportCode::SFO, new DateTimeImmutable('2026-07-01'));
+        $results = $this->repository->search(
+            new Route(AirportCode::ORD, AirportCode::SFO),
+            new DateTimeImmutable('2026-07-01'),
+        );
 
         self::assertCount(0, $results);
     }

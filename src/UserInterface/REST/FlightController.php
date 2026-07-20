@@ -7,6 +7,7 @@ namespace AeroNuk\FlightSearch\UserInterface\REST;
 use AeroNuk\FlightSearch\Domain\AirportCode;
 use AeroNuk\FlightSearch\Domain\FlightNotFound;
 use AeroNuk\FlightSearch\Domain\FlightRepository;
+use AeroNuk\FlightSearch\Domain\Route as FlightRoute;
 use AeroNuk\FlightSearch\Domain\SeatRepository;
 use DateTimeImmutable;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -34,11 +35,12 @@ class FlightController
         assert($request->destination !== null);
         assert($request->date !== null);
 
-        $flights = $this->flightRepository->search(
+        $route = new FlightRoute(
             AirportCode::from($request->origin),
             AirportCode::from($request->destination),
-            new DateTimeImmutable($request->date),
         );
+
+        $flights = $this->flightRepository->search($route, new DateTimeImmutable($request->date));
 
         return JsonResponse::fromJsonString($this->serializer->serialize($flights, 'json'));
     }
