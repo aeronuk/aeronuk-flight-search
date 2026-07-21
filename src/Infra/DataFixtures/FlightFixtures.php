@@ -9,86 +9,170 @@ use AeroNuk\FlightSearch\Domain\Flight;
 use AeroNuk\FlightSearch\Domain\Money;
 use AeroNuk\FlightSearch\Domain\Route;
 use AeroNuk\FlightSearch\Domain\Seat;
+use DateInterval;
 use DateTimeImmutable;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Symfony\Component\Uid\Uuid;
 
+use function number_format;
+use function sprintf;
+
+/**
+ * Generates one recurring weekly flight for every directed AirportCode
+ * pair (30 routes, origin !== destination), from today through
+ * self::MONTHS_AHEAD months out (~43 occurrences per route, ~1,300
+ * flights total) — so almost any origin/destination/date search a
+ * developer tries against the local stack returns a result.
+ */
 class FlightFixtures extends Fixture
 {
+    /** Weekly flights recur through this many months out from today. */
+    private const int MONTHS_AHEAD = 10;
+
+    private const array SEAT_MAP = [
+        '01A' => 'business',
+        '12A' => 'economy',
+        '12B' => 'economy',
+        '12C' => 'economy',
+    ];
+
+    /**
+     * Coarse region per airport, used only to derive a plausible flight
+     * duration below — not a domain concept.
+     */
+    private const array REGIONS = [
+        'JFK' => 'NA',
+        'LAX' => 'NA',
+        'ORD' => 'NA',
+        'SFO' => 'NA',
+        'LHR' => 'EU',
+        'NRT' => 'AS',
+    ];
+
+    /**
+     * Flight duration in whole hours, keyed by "{originRegion}-{destinationRegion}".
+     * Covers every combination reachable with one airport in EU (LHR) and
+     * one in AS (NRT), so the lookup below always finds a match.
+     */
+    private const array REGION_DURATION_HOURS = [
+        'NA-NA' => 3,
+        'NA-EU' => 8,
+        'EU-NA' => 8,
+        'NA-AS' => 12,
+        'AS-NA' => 12,
+        'EU-AS' => 11,
+        'AS-EU' => 11,
+    ];
+
     public function load(ObjectManager $manager): void
     {
-        $flights = [
-            [
-                'AN101',
-                AirportCode::JFK,
-                AirportCode::LAX,
-                '2026-07-01 08:00:00',
-                '2026-07-01 11:30:00',
-                '299.99',
-                'USD',
-            ],
-            [
-                'AN102',
-                AirportCode::LAX,
-                AirportCode::JFK,
-                '2026-07-01 13:00:00',
-                '2026-07-01 21:15:00',
-                '319.99',
-                'USD',
-            ],
-            [
-                'AN201',
-                AirportCode::ORD,
-                AirportCode::SFO,
-                '2026-07-02 09:15:00',
-                '2026-07-02 11:45:00',
-                '249.50',
-                'USD',
-            ],
-            [
-                'AN305',
-                AirportCode::JFK,
-                AirportCode::LHR,
-                '2026-07-03 19:00:00',
-                '2026-07-04 07:00:00',
-                '649.00',
-                'USD',
-            ],
-            [
-                'AN410',
-                AirportCode::SFO,
-                AirportCode::NRT,
-                '2026-07-05 00:30:00',
-                '2026-07-06 05:00:00',
-                '899.00',
-                'USD',
-            ],
-        ];
+        $today   = new DateTimeImmutable('today');
+        $horizon = $today->modify(sprintf('+%d months', self::MONTHS_AHEAD));
 
-        foreach ($flights as [$number, $origin, $destination, $departure, $arrival, $amount, $currency]) {
-            $flight = new Flight(
-                (string) Uuid::v7(),
-                $number,
-                new Route($origin, $destination),
-                new DateTimeImmutable($departure),
-                new DateTimeImmutable($arrival),
-                new Money($amount, $currency),
-            );
-            $manager->persist($flight);
+        $routeNumber = 0;
+        foreach (self::routes() as [$origin, $destination]) {
+            $routeNumber++;
 
-            $seatMap = [
-                '01A' => 'business',
-                '12A' => 'economy',
-                '12B' => 'economy',
-                '12C' => 'economy',
-            ];
-
-            foreach ($seatMap as $seatNumber => $class) {
-                $manager->persist(new Seat((string) Uuid::v7(), $flight, $seatNumber, $class));
-            }
+            $this->loadRoute($manager, $routeNumber, $origin, $destination, $today, $horizon);
         }
 
         $manager->flush();
+    }
+
+    private function loadRoute(
+        ObjectManager $manager,
+        int $routeNumber,
+        AirportCode $origin,
+        AirportCode $destination,
+        DateTimeImmutable $today,
+        DateTimeImmutable $horizon,
+    ): void {
+        $flightNumberPrefix                = sprintf('AN%02d', $routeNumber);
+        $isoWeekday                        = (($routeNumber - 1) % 7) + 1;
+        [$departureHour, $departureMinute] = self::departureTimeOfDay($routeNumber);
+        $durationHours                     = self::durationHours($origin, $destination);
+        $amount                            = self::amount($routeNumber, $durationHours);
+
+        $occurrence    = 1;
+        $departureDate = self::firstOccurrence($today, $isoWeekday);
+
+        while ($departureDate <= $horizon) {
+            $departure = $departureDate->setTime($departureHour, $departureMinute);
+            $arrival   = $departure->add(new DateInterval(sprintf('PT%dH', $durationHours)));
+
+            $flight = new Flight(
+                (string) Uuid::v7(),
+                sprintf('%s%03d', $flightNumberPrefix, $occurrence),
+                new Route($origin, $destination),
+                $departure,
+                $arrival,
+                new Money($amount, 'USD'),
+            );
+            $manager->persist($flight);
+
+            foreach (self::SEAT_MAP as $seatNumber => $class) {
+                $manager->persist(new Seat((string) Uuid::v7(), $flight, $seatNumber, $class));
+            }
+
+            $departureDate = $departureDate->modify('+1 week');
+            $occurrence++;
+        }
+    }
+
+    /** @return list<array{0: AirportCode, 1: AirportCode}> every directed AirportCode pair, origin !== destination */
+    private static function routes(): array
+    {
+        $routes = [];
+        foreach (AirportCode::cases() as $origin) {
+            foreach (AirportCode::cases() as $destination) {
+                if ($origin === $destination) {
+                    continue;
+                }
+
+                $routes[] = [$origin, $destination];
+            }
+        }
+
+        return $routes;
+    }
+
+    /** The next date on/after $today falling on the given ISO-8601 weekday (1 = Monday .. 7 = Sunday). */
+    private static function firstOccurrence(DateTimeImmutable $today, int $isoWeekday): DateTimeImmutable
+    {
+        $todayIsoWeekday = (int) $today->format('N');
+        $daysUntil       = ($isoWeekday - $todayIsoWeekday + 7) % 7;
+
+        return $today->modify(sprintf('+%d days', $daysUntil));
+    }
+
+    /**
+     * A per-route, deterministic time of day so flights aren't all
+     * clustered at midnight — varies across routes purely for realism.
+     *
+     * @return array{0: int, 1: int} hour (24h), minute
+     */
+    private static function departureTimeOfDay(int $routeNumber): array
+    {
+        return [6 + ($routeNumber % 14), ($routeNumber % 4) * 15];
+    }
+
+    private static function durationHours(AirportCode $origin, AirportCode $destination): int
+    {
+        $regionPair = self::REGIONS[$origin->value] . '-' . self::REGIONS[$destination->value];
+
+        // Every combination reachable with one airport in EU (LHR) and one in
+        // AS (NRT) is covered above; this fallback only exists to satisfy
+        // static analysis, which can't infer that origin and destination are
+        // always in different regions when they share one (LHR/NRT).
+        return self::REGION_DURATION_HOURS[$regionPair] ?? 6;
+    }
+
+    /** @return numeric-string a plausible fare, formatted like "299.99" */
+    private static function amount(int $routeNumber, int $durationHours): string
+    {
+        $base = 79.99 + ($durationHours * 45) + (($routeNumber % 5) * 10);
+
+        return number_format($base, 2, '.', '');
     }
 }
