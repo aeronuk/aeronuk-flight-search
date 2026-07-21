@@ -41,7 +41,16 @@ if [ "$1" = 'frankenphp' ] || [ "$1" = 'php' ] || [ "$1" = 'bin/console' ]; then
 			php bin/console doctrine:migrations:migrate --no-interaction --all-or-nothing
 
 			if [ "$APP_ENV" = 'dev' ] || [ "$APP_ENV" = 'test' ]; then
-				php bin/console doctrine:fixtures:load --no-interaction
+				# FlightFixtures now generates ~9,000 flights/~36,000 seats
+				# (daily, not weekly, per route — see CLAUDE.md). In dev,
+				# Doctrine's profiler-driven query backtrace logging
+				# (doctrine.dbal.profiling_collect_backtrace, on whenever
+				# kernel.debug is true) grows for every query executed on
+				# the connection regardless of EntityManager::clear(), and
+				# exhausts PHP's default 128M memory_limit at this volume.
+				# Raised only for this one invocation, not php.ini globally,
+				# since it's a dev/test-only fixture-loading concern.
+				php -d memory_limit=512M bin/console doctrine:fixtures:load --no-interaction
 			fi
 		fi
 	fi

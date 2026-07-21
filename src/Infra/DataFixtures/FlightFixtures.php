@@ -19,15 +19,15 @@ use function number_format;
 use function sprintf;
 
 /**
- * Generates one recurring weekly flight for every directed AirportCode
+ * Generates one recurring daily flight for every directed AirportCode
  * pair (30 routes, origin !== destination), from today through
- * self::MONTHS_AHEAD months out (~43 occurrences per route, ~1,300
+ * self::MONTHS_AHEAD months out (~300 occurrences per route, ~9,000
  * flights total) — so almost any origin/destination/date search a
  * developer tries against the local stack returns a result.
  */
 class FlightFixtures extends Fixture
 {
-    /** Weekly flights recur through this many months out from today. */
+    /** Daily flights recur through this many months out from today. */
     private const int MONTHS_AHEAD = 10;
 
     private const array SEAT_MAP = [
@@ -75,9 +75,16 @@ class FlightFixtures extends Fixture
             $routeNumber++;
 
             $this->loadRoute($manager, $routeNumber, $origin, $destination, $today, $horizon);
-        }
 
-        $manager->flush();
+            // Flushing (and clearing the identity map) once per route, rather
+            // than once at the very end, keeps Doctrine's unit-of-work change
+            // tracking bounded at ~300 flights/~1,200 seats per batch instead
+            // of accumulating all ~9,000 flights/~36,000 seats in memory at
+            // once — without this, fixture loading at this volume exhausts
+            // PHP's default memory_limit.
+            $manager->flush();
+            $manager->clear();
+        }
     }
 
     private function loadRoute(
@@ -89,13 +96,12 @@ class FlightFixtures extends Fixture
         DateTimeImmutable $horizon,
     ): void {
         $flightNumberPrefix                = sprintf('AN%02d', $routeNumber);
-        $isoWeekday                        = (($routeNumber - 1) % 7) + 1;
         [$departureHour, $departureMinute] = self::departureTimeOfDay($routeNumber);
         $durationHours                     = self::durationHours($origin, $destination);
         $amount                            = self::amount($routeNumber, $durationHours);
 
         $occurrence    = 1;
-        $departureDate = self::firstOccurrence($today, $isoWeekday);
+        $departureDate = $today;
 
         while ($departureDate <= $horizon) {
             $departure = $departureDate->setTime($departureHour, $departureMinute);
@@ -115,7 +121,7 @@ class FlightFixtures extends Fixture
                 $manager->persist(new Seat((string) Uuid::v7(), $flight, $seatNumber, $class));
             }
 
-            $departureDate = $departureDate->modify('+1 week');
+            $departureDate = $departureDate->modify('+1 day');
             $occurrence++;
         }
     }
@@ -135,15 +141,6 @@ class FlightFixtures extends Fixture
         }
 
         return $routes;
-    }
-
-    /** The next date on/after $today falling on the given ISO-8601 weekday (1 = Monday .. 7 = Sunday). */
-    private static function firstOccurrence(DateTimeImmutable $today, int $isoWeekday): DateTimeImmutable
-    {
-        $todayIsoWeekday = (int) $today->format('N');
-        $daysUntil       = ($isoWeekday - $todayIsoWeekday + 7) % 7;
-
-        return $today->modify(sprintf('+%d days', $daysUntil));
     }
 
     /**
