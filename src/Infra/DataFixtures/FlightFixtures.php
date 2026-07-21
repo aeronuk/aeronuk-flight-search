@@ -75,9 +75,16 @@ class FlightFixtures extends Fixture
             $routeNumber++;
 
             $this->loadRoute($manager, $routeNumber, $origin, $destination, $today, $horizon);
-        }
 
-        $manager->flush();
+            // Flushing (and clearing the identity map) once per route, rather
+            // than once at the very end, keeps Doctrine's unit-of-work change
+            // tracking bounded at ~300 flights/~1,200 seats per batch instead
+            // of accumulating all ~9,000 flights/~36,000 seats in memory at
+            // once — without this, fixture loading at this volume exhausts
+            // PHP's default memory_limit.
+            $manager->flush();
+            $manager->clear();
+        }
     }
 
     private function loadRoute(
