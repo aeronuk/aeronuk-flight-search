@@ -21,14 +21,14 @@ use function sprintf;
 /**
  * Generates one recurring daily flight for every directed AirportCode
  * pair (30 routes, origin !== destination), from today through
- * self::MONTHS_AHEAD months out (~300 occurrences per route, ~9,000
+ * self::MONTHS_AHEAD months out (~60 occurrences per route, ~1,800
  * flights total) — so almost any origin/destination/date search a
  * developer tries against the local stack returns a result.
  */
 class FlightFixtures extends Fixture
 {
     /** Daily flights recur through this many months out from today. */
-    private const int MONTHS_AHEAD = 10;
+    private const int MONTHS_AHEAD = 2;
 
     private const array SEAT_MAP = [
         '01A' => 'business',
@@ -78,8 +78,8 @@ class FlightFixtures extends Fixture
 
             // Flushing (and clearing the identity map) once per route, rather
             // than once at the very end, keeps Doctrine's unit-of-work change
-            // tracking bounded at ~300 flights/~1,200 seats per batch instead
-            // of accumulating all ~9,000 flights/~36,000 seats in memory at
+            // tracking bounded at ~60 flights/~240 seats per batch instead
+            // of accumulating all ~1,800 flights/~7,200 seats in memory at
             // once — without this, fixture loading at this volume exhausts
             // PHP's default memory_limit.
             $manager->flush();
