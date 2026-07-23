@@ -19,16 +19,21 @@ use function number_format;
 use function sprintf;
 
 /**
- * Generates one recurring daily flight for every directed AirportCode
- * pair (30 routes, origin !== destination), from today through
- * self::MONTHS_AHEAD months out (~300 occurrences per route, ~9,000
- * flights total) — so almost any origin/destination/date search a
- * developer tries against the local stack returns a result.
+ * Generates a realistic multi-departure daily flight schedule for every
+ * directed AirportCode pair (30 routes, origin !== destination): five
+ * scheduled departures per route per day — 05:00, 09:30, 13:45, 18:15,
+ * and a final departure that's either a conventional 23:50 evening flight
+ * or, for a minority of routes, a 01:00 red-eye landing on the following
+ * calendar day — recurring daily from today through self::MONTHS_AHEAD
+ * months out (~60 days, ~300 occurrences per route, ~9,000 flights total)
+ * — so almost any origin/destination/date search a developer tries
+ * against the local stack returns several results, the way a real search
+ * would.
  */
 class FlightFixtures extends Fixture
 {
-    /** Daily flights recur through this many months out from today. */
-    private const int MONTHS_AHEAD = 10;
+    /** The daily departure schedule recurs through this many months out from today. */
+    private const int MONTHS_AHEAD = 2;
 
     private const array SEAT_MAP = [
         '01A' => 'business',
@@ -95,34 +100,40 @@ class FlightFixtures extends Fixture
         DateTimeImmutable $today,
         DateTimeImmutable $horizon,
     ): void {
-        $flightNumberPrefix                = sprintf('AN%02d', $routeNumber);
-        [$departureHour, $departureMinute] = self::departureTimeOfDay($routeNumber);
-        $durationHours                     = self::durationHours($origin, $destination);
-        $amount                            = self::amount($routeNumber, $durationHours);
+        $flightNumberPrefix = sprintf('AN%02d', $routeNumber);
+        $schedule           = self::dailySchedule($routeNumber);
+        $durationHours      = self::durationHours($origin, $destination);
+        $amount             = self::amount($routeNumber, $durationHours);
 
         $occurrence    = 1;
         $departureDate = $today;
 
         while ($departureDate <= $horizon) {
-            $departure = $departureDate->setTime($departureHour, $departureMinute);
-            $arrival   = $departure->add(new DateInterval(sprintf('PT%dH', $durationHours)));
+            foreach ($schedule as [$hour, $minute, $dayOffset]) {
+                $departureDay = $dayOffset > 0
+                    ? $departureDate->modify(sprintf('+%d day', $dayOffset))
+                    : $departureDate;
+                $departure    = $departureDay->setTime($hour, $minute);
+                $arrival      = $departure->add(new DateInterval(sprintf('PT%dH', $durationHours)));
 
-            $flight = new Flight(
-                (string) Uuid::v7(),
-                sprintf('%s%03d', $flightNumberPrefix, $occurrence),
-                new Route($origin, $destination),
-                $departure,
-                $arrival,
-                new Money($amount, 'USD'),
-            );
-            $manager->persist($flight);
+                $flight = new Flight(
+                    (string) Uuid::v7(),
+                    sprintf('%s%03d', $flightNumberPrefix, $occurrence),
+                    new Route($origin, $destination),
+                    $departure,
+                    $arrival,
+                    new Money($amount, 'USD'),
+                );
+                $manager->persist($flight);
 
-            foreach (self::SEAT_MAP as $seatNumber => $class) {
-                $manager->persist(new Seat((string) Uuid::v7(), $flight, $seatNumber, $class));
+                foreach (self::SEAT_MAP as $seatNumber => $class) {
+                    $manager->persist(new Seat((string) Uuid::v7(), $flight, $seatNumber, $class));
+                }
+
+                $occurrence++;
             }
 
             $departureDate = $departureDate->modify('+1 day');
-            $occurrence++;
         }
     }
 
@@ -144,14 +155,41 @@ class FlightFixtures extends Fixture
     }
 
     /**
-     * A per-route, deterministic time of day so flights aren't all
-     * clustered at midnight — varies across routes purely for realism.
+     * A route's daily departure schedule: four fixed times spread across
+     * the morning through evening (05:00, 09:30, 13:45, 18:15), plus a
+     * final departure that's either a conventional late-evening flight
+     * (23:50) or, for routes flagged by isRedEyeRoute(), a red-eye landing
+     * on the following calendar day (01:00) — so most routes' last flight
+     * of the day is conventional, and only a minority run past midnight,
+     * matching how red-eyes work at real airports.
      *
-     * @return array{0: int, 1: int} hour (24h), minute
+     * @return list<array{0: int, 1: int, 2: int}> [hour (24h), minute,
+     *         day offset] for each scheduled departure, in chronological
+     *         order
      */
-    private static function departureTimeOfDay(int $routeNumber): array
+    private static function dailySchedule(int $routeNumber): array
     {
-        return [6 + ($routeNumber % 14), ($routeNumber % 4) * 15];
+        $schedule = [
+            [5, 0, 0],
+            [9, 30, 0],
+            [13, 45, 0],
+            [18, 15, 0],
+        ];
+
+        $schedule[] = self::isRedEyeRoute($routeNumber) ? [1, 0, 1] : [23, 50, 0];
+
+        return $schedule;
+    }
+
+    /**
+     * A deterministic minority of routes (every fifth) run their last
+     * flight of the day as a red-eye departing at 01:00 the following
+     * calendar day, rather than the conventional 23:50 — reflecting that
+     * red-eyes are the exception, not the norm, at real airports.
+     */
+    private static function isRedEyeRoute(int $routeNumber): bool
+    {
+        return $routeNumber % 5 === 0;
     }
 
     private static function durationHours(AirportCode $origin, AirportCode $destination): int

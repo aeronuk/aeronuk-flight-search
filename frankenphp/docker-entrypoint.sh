@@ -42,7 +42,8 @@ if [ "$1" = 'frankenphp' ] || [ "$1" = 'php' ] || [ "$1" = 'bin/console' ]; then
 
 			if [ "$APP_ENV" = 'dev' ] || [ "$APP_ENV" = 'test' ]; then
 				# FlightFixtures now generates ~9,000 flights/~36,000 seats
-				# (daily, not weekly, per route — see CLAUDE.md). In dev,
+				# (multiple scheduled departures per route per day, over a
+				# 2-month horizon — see CLAUDE.md). In dev,
 				# Doctrine's profiler-driven query backtrace logging
 				# (doctrine.dbal.profiling_collect_backtrace, on whenever
 				# kernel.debug is true) grows for every query executed on
